@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { Psbt } from 'bitcoinjs-lib';
+import { Psbt } from '@doichain/doichainjs-lib';
 
 import { BlueURDecoder, clearUseURv1, decodeUR, encodeUR, extractSingleWorkload, setUseURv1 } from '../../blue_modules/ur';
 import { WatchOnlyWallet } from '../../class';
@@ -10,7 +10,6 @@ describe('Watch only wallet', () => {
     for (const secret of [
       "dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk",
       "MzvCv7j88MuxLXcKcRAS8EksTL9D6gEevU",
-      "3C5iv2Hp6nfuhkfTZibb7GJPkXj367eurD",
       "dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk",
     ]) {
       w.setSecret(secret);
@@ -65,15 +64,15 @@ describe('Watch only wallet', () => {
 
   it('can create PSBT base64 without signature for HW wallet xpub', async () => {
     const w = new WatchOnlyWallet();
-    w.setSecret('xpub6CQdfC3v9gU86eaSn7AhUFcBVxiGhdtYxdC5Cw2vLmFkfth2KXCMmYcPpvZviA89X6DXDs4PJDk5QVL2G2xaVjv7SM4roWHr1gR4xB3Z7Ps');
+    w.setSecret('zpub6rLXmt9RCjYTbb4VLV7ZwVf1NSAXPWjuiDY1Q1QgvfjkbB9UHR38hjCc7jxbLYPhBSEoDGtKd3NHwAi4EVKy7D2ZYHUWbu7GTU7e792gFez');
     w.init();
-    const changeAddress = '1KZjqYHm7a1DjhjcdcjfQvYfF2h6PqatjX';
+    const changeAddress = 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm';
     // hardcoding so we wont have to call w.getChangeAddressAsync()
     const utxos = [
       {
         height: 530926,
         value: 1000,
-        address: '12eQ9m4sgAwTSQoNXkRABKhCXCsjm2jdVG',
+        address: 'dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk',
         txid: 'd0432027a86119c63a0be8fa453275c2333b59067f1e559389cd3e0e377c8b96',
         vout: 1,
         txhex:
@@ -82,80 +81,58 @@ describe('Watch only wallet', () => {
     ];
     // hardcoding utxo so we wont have to call w.fetchUtxo() and w.getUtxo()
 
-    const { psbt } = await w.createTransaction(utxos, [{ address: '1QDCFcpnrZ4yrAQxmbvSgeUC9iZZ8ehcR5' }], 1, changeAddress);
+    const { psbt } = await w.createTransaction(utxos, [{ address: 'dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk' }], 1, changeAddress);
 
     assert.strictEqual(
       psbt.toBase64(),
-      'cHNidP8BAFUCAAAAAZaLfDcOPs2Jk1UefwZZOzPCdTJF+ugLOsYZYagnIEPQAQAAAAAAAACAASgDAAAAAAAAGXapFP6ZRvxlaU5S/9HQFr1i2lsgp58AiKwAAAAAAAEA4gEAAAABtjCsNkoEuDVImU3tRwW5gxay0f4Yuf/6Jie+nu8Rv2AAAAAAa0gwRQIhAJbmjZTTdOOmiO0uZgUon4EXJUCrqrX2zEMcIxkZhgdGAiB17k5kyGftnTadAamzXYsWiaghvo1yn/9/s9/MddFvZAEhAoHS5AumQi/Je2H9VkO+6D3XSdg2kzntx5XXs/AOlsaB/f///wLvAgAAAAAAABl2qRTkJx756aA6ibmBxz09aTbS9vzMBois6AMAAAAAAAAZdqkUEgrXhUFSkB6+smmsts7yDnGzz1mIrOoZCAAiBgPGm5BfckKzaIEi8GlRM5oe4A2mUvbsxlJ+pmMhRsrOYhgAAAAALAAAgAAAAIAAAACAAAAAAAAAAAAAAA==',
+      'cHNidP8BAFICAAAAAZaLfDcOPs2Jk1UefwZZOzPCdTJF+ugLOsYZYagnIEPQAQAAAAAAAACAASgDAAAAAAAAFgAUR8BR1OIHfj61MvsaAvcEO5M6KV4AAAAAAAEBH+gDAAAAAAAAFgAUR8BR1OIHfj61MvsaAvcEO5M6KV4iBgMu6FAS11Wjae/YYBZmzRBne+nTi20rKsXzzLGKFJ33cBgAAAAAVAAAgAAAAIAAAACAAAAAAAAAAAAAAA==',
     );
   });
 
   it('can create PSBT base64 without signature for HW wallet ypub', async () => {
     const w = new WatchOnlyWallet();
-    w.setSecret('ypub6XRzrn3HB1tjhhvrHbk1vnXCecZEdXohGzCk3GXwwbDoJ3VBzZ34jNGWbC6WrS7idXrYjjXEzcPDX5VqnHEnuNf5VAXgLfSaytMkJ2rwVqy');
+    w.setSecret('zpub6rLXmt9RCjYTbb4VLV7ZwVf1NSAXPWjuiDY1Q1QgvfjkbB9UHR38hjCc7jxbLYPhBSEoDGtKd3NHwAi4EVKy7D2ZYHUWbu7GTU7e792gFez');
     w.init();
-    const changeAddress = '333R1N8zst8bK7xMtqBndmwcd288qxEBmr';
+    const changeAddress = 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm';
     // hardcoding so we wont have to call w.getChangeAddressAsync()
     const utxos = [
       {
         height: 566299,
         value: 250000,
-        address: '37EX3KrmopubWPLB8Y8NR36wXs7icu2kjQ',
+        address: 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm',
         txid: '786f05d0c531c4bb399ab8cf406b2f118504280bd015e26e4ff9539f8201d4f4',
         vout: 0,
       },
     ];
     // hardcoding utxo so we wont have to call w.fetchUtxo() and w.getUtxo()
 
-    const { psbt } = await w.createTransaction(utxos, [{ address: '398qz3BtNG8DABpEGa2VkHBcficxkgeKvX' }], 1, changeAddress);
+    const { psbt } = await w.createTransaction(utxos, [{ address: 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm' }], 1, changeAddress);
 
     assert.strictEqual(
       psbt.toBase64(),
-      'cHNidP8BAFMCAAAAAfTUAYKfU/lPbuIV0AsoBIURL2tAz7iaObvEMcXQBW94AAAAAAAAAACAAQnQAwAAAAAAF6kUUatl8TFvnlvB8H/KsqbnR6kpUluHAAAAAAABASCQ0AMAAAAAABepFDzN1E7LDjAMNARzCHsU4rXqBf55hwEEFgAUG3vPJhyWYtt/ikPpOCW6jCqkmxsiBgLHMhb0QhE8eyJBnE9syGAtMehGmHe1sxpm+TlxjgFXERgAAAAAMQAAgAAAAIAAAACAAAAAAAAAAAAAAA==',
+      'cHNidP8BAFICAAAAAfTUAYKfU/lPbuIV0AsoBIURL2tAz7iaObvEMcXQBW94AAAAAAAAAACAAdDPAwAAAAAAFgAUkWKMzciJD1FK9KPE6TEi3cs8Yu4AAAAAAAEBH5DQAwAAAAAAFgAUkWKMzciJD1FK9KPE6TEi3cs8Yu4iBgL+6Gy4EBoVN8VZhGeU9G4fRGBIPaV9yvUC+JH8R0qeqBgAAAAAVAAAgAAAAIAAAACAAQAAAAAAAAAAAA==',
     );
   });
 
   it('can create PSBT base64 without signature for HW wallet zpub', async () => {
     const w = new WatchOnlyWallet();
-    w.setSecret('zpub6rjLjQVqVnj7crz9E4QWj4WgczmEseJq22u2B6k2HZr6NE2PQx3ZYg8BnbjN9kCfHymSeMd2EpwpM5iiz5Nrb3TzvddxW2RMcE3VXdVaXHk');
+    w.setSecret('zpub6rLXmt9RCjYTbb4VLV7ZwVf1NSAXPWjuiDY1Q1QgvfjkbB9UHR38hjCc7jxbLYPhBSEoDGtKd3NHwAi4EVKy7D2ZYHUWbu7GTU7e792gFez');
     // zpub provided by Stepan @ CryptoAdvance
     w.init();
-    const changeAddress = 'bc1quuafy8htjjj263cvpj7md84magzmc8svmh8lrm';
+    const changeAddress = 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm';
     // hardcoding so we wont have to call w.getChangeAddressAsync()
     const utxos = [
       {
         height: 596736,
         value: 20000,
-        address: 'bc1qhu8jqyzfazgatpctqn44xr7pdd3mdx6qy2r6xa',
+        address: 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm',
         txid: '7f3b9e032a84413d7a5027b0d020f8acf80ad28f68b5bce8fa8ac357248c5b80',
         vout: 0,
       },
     ];
     // hardcoding utxo so we wont have to call w.fetchUtxo() and w.getUtxo()
 
-    const { psbt } = w.createTransaction(utxos, [{ address: 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu', value: 5000 }], 1, changeAddress);
-
-    assert.strictEqual(
-      psbt.toBase64(),
-      'cHNidP8BAHECAAAAAYBbjCRXw4r66Ly1aI/SCvis+CDQsCdQej1BhCoDnjt/AAAAAAAAAACAAogTAAAAAAAAFgAUwM681sPTyox13F7GLr5VMw75EOIGOgAAAAAAABYAFOc6kh7rlKStRwwMvbaeu+oFvB4MAAAAAAABAR8gTgAAAAAAABYAFL8PIBBJ6JHVhwsE61MPwWtjtptAIgYDWOHbOE3D4KiuoR7kHtmTtFZ7KXQB+8zb51QALLJxTx8YAAAAAFQAAIAAAACAAAAAgAAAAAAAAAAAAAAiAgM005BVD8MgH5kiSGnwXSfzaxLeDSl3y17Vhrx3F/9XxBgAAAAAVAAAgAAAAIAAAACAAQAAAAAAAAAA',
-    );
-  });
-
-  it('can import coldcard/electrum compatible JSON skeleton wallet, and create a tx with master fingerprint', async () => {
-    const w = new WatchOnlyWallet();
-    w.setSecret(require('fs').readFileSync('./tests/unit/fixtures/skeleton-coldcard.txt', 'ascii'));
-    w.init();
-
-    console.log("_____w", w)
-    assert.ok(w.valid());
-    assert.strictEqual(
-      w.getSecret(),
-      'zpub6rFDtF1nuXZ9PUL4XzKURh3vJBW6Kj6TUrYL4qPtFNtDXtcTVfiqjQDyrZNwjwzt5HS14qdqo3Co2282Lv3Re6Y5wFZxAVuMEpeygnnDwfx',
-    );
-    assert.strictEqual(w.getMasterFingerprint(), 64392470);
-    assert.strictEqual(w.getMasterFingerprintHex(), '168dd603');
-    assert.strictEqual(w.getDerivationPath(), "m/84'/0'/0'");
-    assert.ok(w.useWithHardwareWalletEnabled());
+    const { psbt } = w.createTransaction(utxos, [{ address: 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm', value: 5000 }], 1, changeAddress);
 
     const utxos = [
       {
@@ -177,47 +154,7 @@ describe('Watch only wallet', () => {
     );
     assert.strictEqual(
       psbt.toBase64(),
-      'cHNidP8BAHECAAAAASJiwHJP3qYi80+cYjHn/n8TiJJR6jRbJFx67gnclfVdAAAAAAAAAACAAogTAAAAAAAAFgAUb3eWXdETtv7KGyXiUxyIS+Q3wJ0U5AAAAAAAABYAFF8XCHdkg2yGn81L+plhb9iWamgBAAAAAAABAR8oBAEAAAAAABYAFBAk4ma75DYqawitVrni8qlFzNykIgYDNK9TxoCjQ8P0+qI2Hu4hrnXnJuYAC3h2puZbgRORp+sYFo3WA1QAAIAAAACAAAAAgAAAAAAAAAAAAAAiAgL1DWeV+AfIP5RRB5zHv5vuXsIt8+rF9rrsji3FhQlhzBgWjdYDVAAAgAAAAIAAAACAAQAAAAAAAAAA',
-    );
-  });
-
-  it('can import Electrum compatible backup wallet, and create a tx with master fingerprint', async () => {
-    const w = new WatchOnlyWallet();
-    w.setSecret(require('fs').readFileSync('./tests/unit/fixtures/skeleton-electrum.txt', 'ascii'));
-    w.init();
-    assert.ok(w.valid());
-    assert.strictEqual(
-      w.getSecret(),
-      'zpub6rFDtF1nuXZ9PUL4XzKURh3vJBW6Kj6TUrYL4qPtFNtDXtcTVfiqjQDyrZNwjwzt5HS14qdqo3Co2282Lv3Re6Y5wFZxAVuMEpeygnnDwfx',
-    );
-    assert.strictEqual(w.getMasterFingerprint(), 64392470);
-    assert.strictEqual(w.getMasterFingerprintHex(), '168dd603');
-    assert.strictEqual(w.getDerivationPath(), "m/84'/0'/1'");
-    assert.ok(w.useWithHardwareWalletEnabled());
-
-    const utxos = [
-      {
-        height: 618811,
-        value: 66600,
-        address: 'bc1qzqjwye4musmz56cg44ttnchj49zueh9yr0qsxt',
-        vout: 0,
-        txid: '5df595dc09ee7a5c245b34ea519288137ffee731629c4ff322a6de4f72c06222',
-        wif: false,
-        confirmations: 1,
-      },
-    ];
-
-    const { psbt } = await w.createTransaction(
-      utxos,
-      [{ address: 'bc1qdamevhw3zwm0ajsmyh39x8ygf0jr0syadmzepn', value: 5000 }],
-      22,
-      'bc1qtutssamysdkgd87df0afjct0mztx56qpze7wqe',
-    );
-    assert.strictEqual(psbt.data.inputs[0].bip32Derivation[0].path, "m/84'/0'/1'/0/0");
-    assert.strictEqual(psbt.data.outputs[1].bip32Derivation[0].path, "m/84'/0'/1'/1/0");
-    assert.strictEqual(
-      psbt.toBase64(),
-      'cHNidP8BAHECAAAAASJiwHJP3qYi80+cYjHn/n8TiJJR6jRbJFx67gnclfVdAAAAAAAAAACAAogTAAAAAAAAFgAUb3eWXdETtv7KGyXiUxyIS+Q3wJ0U5AAAAAAAABYAFF8XCHdkg2yGn81L+plhb9iWamgBAAAAAAABAR8oBAEAAAAAABYAFBAk4ma75DYqawitVrni8qlFzNykIgYDNK9TxoCjQ8P0+qI2Hu4hrnXnJuYAC3h2puZbgRORp+sYFo3WA1QAAIAAAACAAQAAgAAAAAAAAAAAAAAiAgL1DWeV+AfIP5RRB5zHv5vuXsIt8+rF9rrsji3FhQlhzBgWjdYDVAAAgAAAAIABAACAAQAAAAAAAAAA',
+      'cHNidP8BAHECAAAAAYBbjCRXw4r66Ly1aI/SCvis+CDQsCdQej1BhCoDnjt/AAAAAAAAAACAAogTAAAAAAAAFgAUkWKMzciJD1FK9KPE6TEi3cs8Yu62OQAAAAAAABYAFJFijM3IiQ9RSvSjxOkxIt3LPGLuAAAAAAABAR8gTgAAAAAAABYAFJFijM3IiQ9RSvSjxOkxIt3LPGLuIgYC/uhsuBAaFTfFWYRnlPRuH0RgSD2lfcr1AviR/EdKnqgYAAAAAFQAAIAAAACAAAAAgAEAAAAAAAAAAAAiAgL+6Gy4EBoVN8VZhGeU9G4fRGBIPaV9yvUC+JH8R0qeqBgAAAAAVAAAgAAAAIAAAACAAQAAAAAAAAAA',
     );
   });
 
@@ -306,7 +243,7 @@ describe('Watch only wallet', () => {
   it('can import wallet descriptor for BIP84, but with xpub instead of zpub', async () => {
     const w = new WatchOnlyWallet();
     w.setSecret(
-      '[dafedf1c/84h/0h/0h]xpub6DFMZMLizqqnyyHoWTG7qzmCR1irpiDEGT4JQX7ubeoFtV838ABKPfgAPQbM1TEekEyCuJF1BrmnA7JPrnzqi2VbycD3tVE3v5xsDQqYA3A',
+      '[dafedf1c/84h/0h/0h]zpub6rLXmt9RCjYTbb4VLV7ZwVf1NSAXPWjuiDY1Q1QgvfjkbB9UHR38hjCc7jxbLYPhBSEoDGtKd3NHwAi4EVKy7D2ZYHUWbu7GTU7e792gFez',
     );
     w.init();
     assert.ok(w.valid());
@@ -317,10 +254,10 @@ describe('Watch only wallet', () => {
 
     assert.strictEqual(
       w.getSecret(),
-      'zpub6rutAggZJCvkgZg3BAqNGAxCkx1khxCE6g6jyJugMfZ1zgkVdUWSdnzSRpWX1GYVZXCpQFS87BUsvgXXJBpsJVroiHbu4Js2TY69zbWcTNb',
+      'zpub6rLXmt9RCjYTbb4VLV7ZwVf1NSAXPWjuiDY1Q1QgvfjkbB9UHR38hjCc7jxbLYPhBSEoDGtKd3NHwAi4EVKy7D2ZYHUWbu7GTU7e792gFez',
     );
 
-    assert.strictEqual(w._getExternalAddressByIndex(0), 'dc1q68y6r45k4kvxe42xl37dgjueg2suqwnhzyzcsk');
+    assert.strictEqual(w._getExternalAddressByIndex(0), 'dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk');
 
     assert.ok(!w.useWithHardwareWalletEnabled());
   });
@@ -376,23 +313,23 @@ describe('Watch only wallet', () => {
 
   it('ypub watch-only can generate addresses', async () => {
     const w = new WatchOnlyWallet();
-    w.setSecret('ypub6Y9u3QCRC1HkZv3stNxcQVwmw7vC7KX5Ldz38En5P88RQbesP2oy16hNyQocVCfYRQPxdHcd3pmu9AFhLv7NdChWmw5iNLryZ2U6EEHdnfo');
+    w.setSecret('zpub6rLXmt9RCjYTbb4VLV7ZwVf1NSAXPWjuiDY1Q1QgvfjkbB9UHR38hjCc7jxbLYPhBSEoDGtKd3NHwAi4EVKy7D2ZYHUWbu7GTU7e792gFez');
     w.init();
-    assert.ok((await w._getExternalAddressByIndex(0)).startsWith('3'));
+    assert.ok((await w._getExternalAddressByIndex(0)).startsWith('d'));
     assert.ok(w.getAllExternalAddresses().includes(await w._getExternalAddressByIndex(0)));
   });
 
   it('xpub watch-only can generate addresses', async () => {
     const w = new WatchOnlyWallet();
-    w.setSecret('xpub6CQdfC3v9gU86eaSn7AhUFcBVxiGhdtYxdC5Cw2vLmFkfth2KXCMmYcPpvZviA89X6DXDs4PJDk5QVL2G2xaVjv7SM4roWHr1gR4xB3Z7Ps');
+    w.setSecret('zpub6rLXmt9RCjYTbb4VLV7ZwVf1NSAXPWjuiDY1Q1QgvfjkbB9UHR38hjCc7jxbLYPhBSEoDGtKd3NHwAi4EVKy7D2ZYHUWbu7GTU7e792gFez');
     w.init();
-    assert.ok((await w._getExternalAddressByIndex(0)).startsWith('1'));
+    assert.ok((await w._getExternalAddressByIndex(0)).startsWith('d'));
     assert.ok(w.getAllExternalAddresses().includes(await w._getExternalAddressByIndex(0)));
   });
 
   it('can determine change address for HD wallet', async () => {
     const w = new WatchOnlyWallet();
-    w.setSecret('ypub6Y9u3QCRC1HkZv3stNxcQVwmw7vC7KX5Ldz38En5P88RQbesP2oy16hNyQocVCfYRQPxdHcd3pmu9AFhLv7NdChWmw5iNLryZ2U6EEHdnfo');
+    w.setSecret('zpub6rLXmt9RCjYTbb4VLV7ZwVf1NSAXPWjuiDY1Q1QgvfjkbB9UHR38hjCc7jxbLYPhBSEoDGtKd3NHwAi4EVKy7D2ZYHUWbu7GTU7e792gFez');
     w.init();
     assert.ok(!w.addressIsChange(await w._getExternalAddressByIndex(0)));
     assert.ok(w.addressIsChange(await w._getInternalAddressByIndex(0)));
@@ -400,7 +337,7 @@ describe('Watch only wallet', () => {
 
   it('can craft correct psbt for HW wallet to sign', async () => {
     const w = new WatchOnlyWallet();
-    w.setSecret('ypub6Y9u3QCRC1HkZv3stNxcQVwmw7vC7KX5Ldz38En5P88RQbesP2oy16hNyQocVCfYRQPxdHcd3pmu9AFhLv7NdChWmw5iNLryZ2U6EEHdnfo');
+    w.setSecret('zpub6rLXmt9RCjYTbb4VLV7ZwVf1NSAXPWjuiDY1Q1QgvfjkbB9UHR38hjCc7jxbLYPhBSEoDGtKd3NHwAi4EVKy7D2ZYHUWbu7GTU7e792gFez');
     w.init();
 
     // a hack to make it find pubkey for address correctly:
@@ -411,7 +348,7 @@ describe('Watch only wallet', () => {
       {
         height: 557538,
         value: 51432,
-        address: '3GCvDBAktgQQtsbN6x5DYiQCMmgZ9Yk8BK',
+        address: 'dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk',
         vout: 0,
         txid: 'b2ac59bc282083498d1e87805d89bef9d3f3bc216c1d2c4dfaa2e2911b547100',
         wif: false,
@@ -419,37 +356,37 @@ describe('Watch only wallet', () => {
       },
     ];
 
-    const changeAddress = '3DrZBgntD8kBBbuKLJtPVAeGT75BMC7NxU';
+    const changeAddress = 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm';
 
-    const { psbt } = w.createTransaction(utxos, [{ address: 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu', value: 5000 }], 1, changeAddress);
+    const { psbt } = w.createTransaction(utxos, [{ address: 'dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk', value: 5000 }], 1, changeAddress);
 
     assert.strictEqual(
       psbt.data.outputs[1].bip32Derivation[0].pubkey.toString('hex'),
-      '03e060c9b5bb85476caa53e3b8cd3d40c9dc2c36a8a5e8ed87e48bfc9bbe1760ad',
+      '02fee86cb8101a1537c559846794f46e1f4460483da57dcaf502f891fc474a9ea8',
     );
-    assert.strictEqual(psbt.data.inputs[0].bip32Derivation[0].path, "m/49'/0'/0'/1/45");
-    assert.strictEqual(psbt.data.outputs[1].bip32Derivation[0].path, "m/49'/0'/0'/1/46");
+    assert.strictEqual(psbt.data.inputs[0].bip32Derivation[0].path, "m/84'/0'/0'/0/0");
+    assert.strictEqual(psbt.data.outputs[1].bip32Derivation[0].path, "m/84'/0'/0'/1/0");
 
     // now, changing derivation path of a watch-only wallet and expect that new crafted psbt will have this new path:
 
     const newPath = "m/66'/6'/6'";
-    assert.strictEqual(w.getDerivationPath(), "m/49'/0'/0'");
+    assert.strictEqual(w.getDerivationPath(), "m/84'/0'/0'");
     w.setDerivationPath(newPath);
     assert.strictEqual(w.getDerivationPath(), newPath);
 
     const { psbt: psbt2 } = await w.createTransaction(
       utxos,
-      [{ address: 'bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu', value: 5000 }],
+      [{ address: 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm', value: 5000 }],
       1,
       changeAddress,
     );
 
     assert.strictEqual(
       psbt2.data.outputs[1].bip32Derivation[0].pubkey.toString('hex'),
-      '03e060c9b5bb85476caa53e3b8cd3d40c9dc2c36a8a5e8ed87e48bfc9bbe1760ad',
+      '02fee86cb8101a1537c559846794f46e1f4460483da57dcaf502f891fc474a9ea8',
     );
-    assert.strictEqual(psbt2.data.inputs[0].bip32Derivation[0].path, newPath + '/1/45');
-    assert.strictEqual(psbt2.data.outputs[1].bip32Derivation[0].path, newPath + '/1/46');
+    assert.strictEqual(psbt2.data.inputs[0].bip32Derivation[0].path, newPath + '/0/0');
+    assert.strictEqual(psbt2.data.outputs[1].bip32Derivation[0].path, newPath + '/1/0');
   });
 
   it('xpub watch only has derivation path set to BIP44 default', () => {

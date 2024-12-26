@@ -428,8 +428,7 @@ class DeeplinkSchemaMatch {
     for (const replaceMe of ['DOICHAIN://', 'doichain://', 'DOICHAIN:']) {
       replacedUri = replacedUri.replace(replaceMe, 'doichain:');
     }
-
-    return bip21.decode(replacedUri);
+    return bip21.decode(replacedUri, 'doichain');
   }
 
   static bip21encode(address: string, options: TOptions): string {
@@ -441,7 +440,7 @@ class DeeplinkSchemaMatch {
         delete options[key];
       }
     }    
-    return address // bip21.encode(address, options); 
+    return  bip21.encode(address, options, 'doichain'); 
   }
 
   static decodeBitcoinUri(uri: string) {

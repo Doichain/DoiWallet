@@ -501,7 +501,7 @@
     "vault_key": "Vault Key {number}",
     "required_keys_out_of_total": "Required keys out of the total",
     "fee": "Fee: {number}",
-    "fee_btc": "{number} BTC",
+    "fee_btc": "{number} DOI",
     "confirm": "Confirm",
     "header": "Send",
     "share": "Share...",

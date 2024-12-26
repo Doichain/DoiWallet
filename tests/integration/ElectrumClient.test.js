@@ -37,7 +37,7 @@ describe('ElectrumClient', () => {
       const start = +new Date();
       let balance = await mainClient.blockchainScripthash_getBalance(reversedHash.toString('hex'));
       const end = +new Date();
-      end - start > 1000 && console.warn(peer.host, 'took', (end - start) / 1000, 'seconds to fetch balance');
+      //end - start > 1000 && console.warn(peer.host, 'took', (end - start) / 1000, 'seconds to fetch balance');
       assert.ok(balance.confirmed > 0);
 
       addr4elect = '3GCvDBAktgQQtsbN6x5DYiQCMmgZ9Yk8BK';

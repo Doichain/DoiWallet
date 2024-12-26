@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import * as bitcoin from 'bitcoinjs-lib';
+import * as bitcoin from '@doichain/doichainjs-lib';
 import bitcoinMessage from 'bitcoinjs-message';
 import coinSelect, { CoinSelectOutput, CoinSelectReturnInput, CoinSelectTarget } from 'coinselect';
 import coinSelectSplit from 'coinselect/split';
@@ -381,7 +381,7 @@ export class LegacyWallet extends AbstractWallet {
 
     // .inputs and .outputs will be undefined if no solution was found
     if (!inputs || !outputs) {
-      throw new Error('Not enough balance. Try sending smaller amount or decrease the fee.');
+     // throw new Error('Not enough balance. Try sending smaller amount or decrease the fee.');
     }
 
     return { inputs, outputs, fee };

@@ -1,6 +1,6 @@
 {
   "name": "doiwallet",
-  "version": "7.0.3",
+  "version": "7.0.4",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -91,7 +91,7 @@
     "@react-navigation/drawer": "6.7.2",
     "@react-navigation/native": "6.1.18",
     "@react-navigation/native-stack": "6.11.0",
-    "@remobile/react-native-qrcode-local-image": "github:BlueWallet/react-native-qrcode-local-image#31b0113110fbafcf5a5f3ca4183a563550f5c352",
+    "@remobile/react-native-qrcode-local-image": "github:davidreband/react-native-qrcode-local-image.git",
     "@rneui/base": "4.0.0-rc.8",
     "@rneui/themed": "4.0.0-rc.8",
     "@spsina/bip47": "github:BlueWallet/bip47#f4b8047",
@@ -108,6 +108,7 @@
     "bip39": "3.1.0",
     "bitcoinjs-message": "2.2.0",
     "bolt11": "1.4.1",
+    "bs58check": "^2.1.2",
     "buffer": "6.0.3",
     "coinselect": "3.1.13",
     "crypto-js": "4.2.0",

@@ -9,6 +9,7 @@ import { satoshiToBTC, satoshiToLocalCurrency } from '../../blue_modules/currenc
 import { BlueCard, BlueText } from '../../BlueComponents';
 
 import { DoichainUnit } from "../../models/doichainUnits";
+import { DOICHAIN } from '../../blue_modules/network.js';
 import presentAlert from '../../components/Alert';
 import Button from '../../components/Button';
 import SafeArea from '../../components/SafeArea';

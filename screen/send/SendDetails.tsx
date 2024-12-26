@@ -618,7 +618,7 @@ const SendDetails = () => {
     assert(change, 'Could not get change address');
     const requestedSatPerByte = Number(feeRate);
     const lutxo: CreateTransactionUtxo[] = utxo || (wallet?.getUtxo() ?? []);
-    console.log({ requestedSatPerByte, lutxo: lutxo.length });
+    console.log({ requestedSatPerByte, lutxo: lutxo?.length || 0});
 
     const targets: CreateTransactionTarget[] = [];
     for (const transaction of addresses) {

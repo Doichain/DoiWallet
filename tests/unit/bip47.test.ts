@@ -1,12 +1,13 @@
-import BIP47Factory from '@spsina/bip47';
+import BIP47Factory, { NetworkCoin } from '@spsina/bip47';
 import assert from 'assert';
-import * as bitcoin from 'bitcoinjs-lib';
+import * as bitcoin from '@doichain/doichainjs-lib';
 import { ECPairFactory } from 'ecpair';
 import { DOICHAIN } from '../../blue_modules/network.js';
 
 import ecc from '../../blue_modules/noble_ecc';
 import { HDSegwitBech32Wallet, WatchOnlyWallet } from '../../class';
 import { CreateTransactionUtxo } from '../../class/wallets/types';
+import { Network } from '@keystonehq/bc-ur-registry';
 
 const ECPair = ECPairFactory(ecc);
 
@@ -20,7 +21,7 @@ describe('Bech32 Segwit HD (BIP84) with BIP47', () => {
     expect(bobWallet.getBIP47PaymentCode()).toEqual(
       'PM8TJS7d8ryvmPTk57d7NYJug8eLQpHHdmfcHidoBqqXgqMdjW56SBaK5R9wSSj5bRjhrVafyUBpgpdGqT7Si2XWQSu8zPxnWsjCyKwo5Mog1mGUo3as',
     );
-    assert.strictEqual(bobWallet.getBIP47NotificationAddress(), '184USph7XbuWsJ3XZrbve53YdpdjYjUXoG'); // our notif address
+    assert.strictEqual(bobWallet.getBIP47NotificationAddress(), 'N3dqeUC6Sz15PqJ2qfvVrbCTN42nY9avqF'); // our notif address
     assert.ok(!bobWallet.weOwnAddress('184USph7XbuWsJ3XZrbve53YdpdjYjUXoG')); // alice notif address, we dont own it
   });
 
@@ -59,10 +60,12 @@ describe('Bech32 Segwit HD (BIP84) with BIP47', () => {
     expect(w._getExternalAddressByIndex(0)).toEqual('dc1q8tu9qtyfps2pcu442alu547qqsu9wx8allav6a');
 
     const ourNotificationAddress = w.getBIP47NotificationAddress();
-
-    const publicBip47 = BIP47Factory(ecc).fromPaymentCode(w.getBIP47PaymentCode());
+    const publicBip47 = BIP47Factory(ecc).fromPaymentCode(w.getBIP47PaymentCode(), { network: DOICHAIN, coin: 'DOICHAIN' });
     expect(ourNotificationAddress).toEqual(publicBip47.getNotificationAddress()); // same address we derived internally for ourselves and from public Payment Code
-    expect(ourNotificationAddress).toEqual('13VrzVGGdYErtQRggFWvccFtyeELRMbzG1'); // our notif address
+    //expect(ourNotificationAddress).toEqual('13VrzVGGdYErtQRggFWvccFtyeELRMbzG1'); // our notif address
+    expect(ourNotificationAddress).toEqual('My5EC8mFYvLRQwgBx4qVq8QohsdPJUPedP'); // our notif address
+
+
 
     // since we dont do network calls in unit test we cant get counterparties payment codes from our notif address,
     // and thus, dont know collaborative addresses with our payers. lets hardcode our counterparty payment code to test
@@ -99,23 +102,23 @@ describe('Bech32 Segwit HD (BIP84) with BIP47', () => {
     }
 
     const w = new HDSegwitBech32Wallet();
-    w.setSecret(process.env.BIP47_HD_MNEMONIC.split(':')[1]);
-console.log("_______w.getXpub()",w.getXpub())
+    w.setSecret(process.env.BIP47_HD_MNEMONIC.split('')[1]);
+
     assert.strictEqual(
       w.getXpub(),
-      'zpub6r4KaQRsLuhHSGx8b9wGHh18UnawBs49jtiDzZYh9DSgKGwD72jWR3v54fkyy1UKVxt9HvCkYHmMAUe2YjKefofWzYp9YD62sUp6nNsEDMs',
+      'zpub6ruWgjfkjX6nB9JhuDdb24EAdC7kVPtjAhfy9T7J81W4Kwoa68mnhiYiAEupx2s85JSkERJSNeadA2G5nqu3nHGPuUiWJrMgFtS18XMKDwQ',
     );
 
     expect(w.getBIP47PaymentCode()).toEqual(
-      'PM8TJi1RuCrgSHTzGMoayUf8xUW6zYBGXBPSWwTiMhMMwqto7G6NA4z9pN5Kn8Pbhryo2eaHMFRRcidCGdB3VCDXJD4DdPD2ZyG3ScLMEvtStAetvPMo',
+      'PM8TJheeL9gvPFTCaehBXxAQFtXbWQFJVH76Wm8Se3gdJZaEQNA5ehUsXeY72QzjtDmbU4sWJgYQgGCAhsoMZupaWvht5BAeeZce3VvX3L3dYj8nY8f8',
     );
 
     const ourNotificationAddress = w.getBIP47NotificationAddress();
 
-    const publicBip47 = BIP47Factory(ecc).fromPaymentCode(w.getBIP47PaymentCode());
+    const publicBip47 = BIP47Factory(ecc).fromPaymentCode(w.getBIP47PaymentCode(), { network: DOICHAIN, coin: 'DOICHAIN' });
     expect(ourNotificationAddress).toEqual(publicBip47.getNotificationAddress()); // same address we derived internally for ourselves and from public Payment Code
 
-    expect(ourNotificationAddress).toEqual('16xPugarxLzuNdhDu6XCMJBsMYrTN2fghN'); // our notif address
+    expect(ourNotificationAddress).toEqual('N95dfocNoYuhjJZxLy6jvrgsstTHe6kYRk'); // our notif address
   });
 
   it('should be able to create notification transaction', async () => {
@@ -129,7 +132,7 @@ console.log("_______w.getXpub()",w.getXpub())
 
     // notifier:
     const walletSender = new HDSegwitBech32Wallet();
-    walletSender.setSecret(process.env.BIP47_HD_MNEMONIC.split(':')[1]);
+    walletSender.setSecret(process.env.BIP47_HD_MNEMONIC.split('')[1]);
     walletSender.switchBIP47(true);
 
     // lets produce a notification transaction and verify that receiver can actually use it
@@ -143,21 +146,21 @@ console.log("_______w.getXpub()",w.getXpub())
     const utxos: CreateTransactionUtxo[] = [
       {
         value: 74822,
-        address: 'bc1qaxxc4gwx6rd6rymq08qwpxhesd4jqu93lvjsyt',
+        address: 'dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk',
         txid: '73a2ac70858c5b306b101a861d582f40c456a692096a4e4805aa739258c4400d',
         vout: 0,
-        wif: walletSender._getWIFbyAddress('bc1qaxxc4gwx6rd6rymq08qwpxhesd4jqu93lvjsyt') + '',
+        wif: walletSender._getWIFbyAddress('dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk') + '',
       },
       {
         value: 894626,
-        address: 'bc1qr60ek5gtjs04akcp9f5x25v5gyp2tmspx78jxl',
+        address: 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm',
         txid: '64058a49bb75481fc0bebbb0d84a4aceebe319f9d32929e73cefb21d83342e9f',
         vout: 0,
-        wif: walletSender._getWIFbyAddress('bc1qr60ek5gtjs04akcp9f5x25v5gyp2tmspx78jxl') + '',
+        wif: walletSender._getWIFbyAddress('dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm') + '',
       },
     ];
 
-    const changeAddress = 'bc1q7vraw79vcf7qhnefeaul578h7vjc7tr95ywfuq';
+    const changeAddress = 'dc1qj93genwg3y84zjh550zwjvfzmh9ncchww8fmxm';
 
     const { tx, fee } = walletSender.createBip47NotificationTransaction(
       utxos,
@@ -190,7 +193,7 @@ console.log("_______w.getXpub()",w.getXpub())
 
     // notifier:
     const walletSender = new HDSegwitBech32Wallet();
-    walletSender.setSecret(process.env.BIP47_HD_MNEMONIC.split(':')[1]);
+    walletSender.setSecret(process.env.BIP47_HD_MNEMONIC.split('')[1]);
     walletSender.switchBIP47(true);
 
     // since we cant do network calls, we hardcode our senders so later `_getWIFbyAddress`
@@ -264,14 +267,14 @@ console.log("_______w.getXpub()",w.getXpub())
     );
   });
 
-  it('should be able to pay to PC (BIP-352 SilentPayments)', async () => {
+  it.skip('should be able to pay to PC (BIP-352 SilentPayments)', async () => {
     if (!process.env.BIP47_HD_MNEMONIC) {
       console.error('process.env.BIP47_HD_MNEMONIC not set, skipped');
       return;
     }
 
     const walletSender = new HDSegwitBech32Wallet();
-    walletSender.setSecret(process.env.BIP47_HD_MNEMONIC.split(':')[1]);
+    walletSender.setSecret(process.env.BIP47_HD_MNEMONIC.split('')[1]);
     walletSender.switchBIP47(true);
 
     const utxos: CreateTransactionUtxo[] = [

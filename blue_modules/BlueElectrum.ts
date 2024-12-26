@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BigNumber from 'bignumber.js';
-import * as bitcoin from 'bitcoinjs-lib';
+import * as bitcoin from '@doichain/doichainjs-lib';
 import { Alert } from 'react-native';
 import DefaultPreference from 'react-native-default-preference';
 import RNFS from 'react-native-fs';

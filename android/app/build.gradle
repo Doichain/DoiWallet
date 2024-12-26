@@ -79,8 +79,8 @@ android {
         applicationId "org.doichain.doiwallet"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 105
-        versionName "7.0.3"
+        versionCode 114
+        versionName "7.0.4"
 
         testBuildType System.getProperty('testBuildType', 'debug')
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'

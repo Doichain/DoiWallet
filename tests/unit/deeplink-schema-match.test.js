@@ -347,9 +347,9 @@ describe.each(['', '//'])('unit - DeepLinkSchemaMatch', function (suffix) {
   });
 */
   it('decodes bip21', () => {
-    let decoded = DeeplinkSchemaMatch.bip21decode(`doichain:${suffix}1BgGZ9tcN4rm9KBMzC5FZxbqY2NXBkrQr78Ydnq6ux14PB7PfzDn7KprQz87SZ26SAMH?amount=20.3&label=Foobar`);
+    let decoded = DeeplinkSchemaMatch.bip21decode(`doichain:${suffix}N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e?amount=20.3&label=Foobar`);
     assert.deepStrictEqual(decoded, {
-      address: '1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH',
+      address: 'N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e',
       options: {
         amount: 20.3,
         label: 'Foobar',
@@ -357,13 +357,13 @@ describe.each(['', '//'])('unit - DeepLinkSchemaMatch', function (suffix) {
     });
 
     decoded = DeeplinkSchemaMatch.bip21decode(
-      `doichain:${suffix}bc1qnapskphjnwzw2w3dk4anpxntunc77v6qrua0f7?amount=0.0001&pj=https://btc.donate.kukks.org/BTC/pj`,
+      `doichain:${suffix}N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e?amount=0.0001&pj=https://btc.donate.kukks.org/BTC/pj`,
     );
     assert.strictEqual(decoded.options.pj, 'https://btc.donate.kukks.org/BTC/pj');
 
-    decoded = DeeplinkSchemaMatch.bip21decode(`DOICHAIN:${suffix}NE3VSuPqncN5MiwjWUK9haRF3xT3pfQpFb?amount=20.3&label=Foobar`);
+    decoded = DeeplinkSchemaMatch.bip21decode(`DOICHAIN:${suffix}N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e?amount=20.3&label=Foobar`);
     assert.deepStrictEqual(decoded, {
-      address: "NE3VSuPqncN5MiwjWUK9haRF3xT3pfQpFb",
+      address: "N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e",
       options: {
         amount: 20.3,
         label: "Foobar",
@@ -372,30 +372,30 @@ describe.each(['', '//'])('unit - DeepLinkSchemaMatch', function (suffix) {
   });
 
   it('encodes bip21', () => {
-    let encoded = DeeplinkSchemaMatch.bip21encode('NE3VSuPqncN5MiwjWUK9haRF3xT3pfQpFb');
-    assert.strictEqual(encoded, "NE3VSuPqncN5MiwjWUK9haRF3xT3pfQpFb");
-    encoded = DeeplinkSchemaMatch.bip21encode('NE3VSuPqncN5MiwjWUK9haRF3xT3pfQpFb', {
+    let encoded = DeeplinkSchemaMatch.bip21encode('N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e');
+    assert.strictEqual(encoded, "doichain:N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e");
+    encoded = DeeplinkSchemaMatch.bip21encode('N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e', {
       amount: 20.3,
       label: 'Foobar',
     });
-    assert.strictEqual(encoded, 'doichain:NE3VSuPqncN5MiwjWUK9haRF3xT3pfQpFb?amount=20.3&label=Foobar');
+    assert.strictEqual(encoded, 'doichain:N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e?amount=20.3&label=Foobar');
   });
 
   it('encodes bip21 and discards empty arguments', () => {
-    const encoded = DeeplinkSchemaMatch.bip21encode('NE3VSuPqncN5MiwjWUK9haRF3xT3pfQpFb', {
+    const encoded = DeeplinkSchemaMatch.bip21encode('N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e', {
       label: ' ',
       amoount: undefined,
     });
-    assert.strictEqual(encoded, "NE3VSuPqncN5MiwjWUK9haRF3xT3pfQpFb");
+    assert.strictEqual(encoded, "doichain:N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e");
   });
 
   it('can decodeBitcoinUri', () => {
     assert.deepStrictEqual(
       DeeplinkSchemaMatch.decodeBitcoinUri(
-        `doichain:${suffix}bc1qnapskphjnwzw2w3dk4anpxntunc77v6qrua0f7?amount=0.0001&pj=https://btc.donate.kukks.org/BTC/pj`,
+        `doichain:${suffix}N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e?amount=0.0001&pj=https://btc.donate.kukks.org/BTC/pj`,
       ),
       {
-        address: 'bc1qnapskphjnwzw2w3dk4anpxntunc77v6qrua0f7',
+        address: 'N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e',
         amount: 0.0001,
         memo: '',
         payjoinUrl: 'https://btc.donate.kukks.org/BTC/pj',
@@ -403,9 +403,9 @@ describe.each(['', '//'])('unit - DeepLinkSchemaMatch', function (suffix) {
     );
 
     assert.deepStrictEqual(
-      DeeplinkSchemaMatch.decodeBitcoinUri(`BITCOIN:${suffix}1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH?amount=20.3&label=Foobar`),
+      DeeplinkSchemaMatch.decodeBitcoinUri(`doichain:${suffix}N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e?amount=20.3&label=Foobar`),
       {
-        address: '1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH',
+        address: 'N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e',
         amount: 20.3,
         memo: 'Foobar',
         payjoinUrl: '',

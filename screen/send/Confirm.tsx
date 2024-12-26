@@ -25,6 +25,7 @@ import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import { ContactList } from '../../class/contact-list';
 import { useStorage } from '../../hooks/context/useStorage';
 import { HDSegwitBech32Wallet } from '../../class';
+import { DOICHAIN } from '../../blue_modules/network';
 
 enum ActionType {
   SET_LOADING = 'SET_LOADING',
@@ -167,7 +168,7 @@ const Confirm: React.FC = () => {
     if (!(recipients.length > 0) || !recipients[0].address) {
       return undefined;
     }
-    return bitcoin.address.toOutputScript(recipients[0].address, bitcoin.networks.bitcoin);
+    return bitcoin.address.toOutputScript(recipients[0].address, DOICHAIN);
   };
 
   const send = async () => {

@@ -48,12 +48,12 @@ const RateExtractors = {
   CoinGecko: async (ticker: string): Promise<number> => {
     let json;
     try {
-      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=Doi&vs_currencies=${ticker.toLowerCase()}`);
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=doichain&vs_currencies=${ticker.toLowerCase()}`);
       json = await res.json();       
     } catch (e: any) {
       throw new Error(`Could not update rate for ${ticker}: ${e.message}`);
     }
-    const rate = json?.Doi?.[ticker] || json?.Doi?.[ticker.toLowerCase()];
+    const rate = json?.doichain?.[ticker] || json?.doichain?.[ticker.toLowerCase()];
 
     if (!rate) throw new Error(`Could not update rate for ${ticker}: data is wrong`);
     return rate;

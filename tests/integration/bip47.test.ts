@@ -1,8 +1,9 @@
 // import assert from 'assert';
 import BIP47Factory from '@spsina/bip47';
 import assert from 'assert';
-import * as bitcoin from 'bitcoinjs-lib';
+import * as bitcoin from '@doichain/doichainjs-lib';
 import { ECPairFactory } from 'ecpair';
+import { DOICHAIN } from '../../blue_modules/network.js';
 
 import * as BlueElectrum from '../../blue_modules/BlueElectrum';
 import ecc from '../../blue_modules/noble_ecc';

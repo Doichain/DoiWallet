@@ -12,6 +12,7 @@ import { SquareButton } from '../../components/SquareButton';
 import { useTheme } from '../../components/themes';
 import { scanQrHelper } from '../../helpers/scan-qr';
 import loc from '../../loc';
+import { DOICHAIN } from '../../blue_modules/network.js';
 
 const PsbtMultisigQRCode = () => {
   const { navigate } = useNavigation();

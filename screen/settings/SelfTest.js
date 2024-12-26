@@ -2,11 +2,12 @@ import BIP32Factory from 'bip32';
 
 import bip38 from 'bip38';
 import * as bip39 from 'bip39';
-import * as Doi from 'bitcoinjs-lib';
+import * as bitcoin from '@doichain/doichainjs-lib';
 import React, { Component } from 'react';
 import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import BlueCrypto from 'react-native-blue-crypto';
 import wif from 'wif';
+import { DOICHAIN } from "../../blue_modules/network.js";
 
 
 import * as BlueElectrum from '../../blue_modules/BlueElectrum';
@@ -83,7 +84,7 @@ export default class SelfTest extends Component {
       if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') {
         await BlueElectrum.ping();
         await BlueElectrum.waitTillConnected();
-        const addr4elect = '3GCvDBAktgQQtsbN6x5DYiQCMmgZ9Yk8BK';
+        const addr4elect = 'NJWoTYFUepniDXffwg1WYvRH86JhMqTfTP';
         const electrumBalance = await BlueElectrum.getBalanceByAddress(addr4elect);
         if (electrumBalance.confirmed !== 51432)
           throw new Error('BlueElectrum getBalanceByAddress failure, got ' + JSON.stringify(electrumBalance));

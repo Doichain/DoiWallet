@@ -376,6 +376,13 @@ const WalletsAdd: React.FC = () => {
           onPress={handleOnBitcoinButtonPressed}
           size={styles.button}
         />
+        <WalletButton
+          buttonType="Vault"
+          testID="ActivateVaultButton"
+          active={selectedWalletType === ButtonSelected.VAULT}
+          onPress={handleOnVaultButtonPressed}
+          size={styles.button}
+        />
       </View>
 
       <View style={styles.advanced}>

@@ -23,7 +23,7 @@ describe('AbstractHDElectrumWallet.cosign', () => {
       {
         height: 349566,
         value: 8323200,
-        address: "MzvCv7j88MuxLXcKcRAS8EksTL9D6gEevU",
+        address: "N5ac3ywbkm11zVrtUfBFkRPhcjAygsc3SP",
         vout: 0,
         txid: "95e43c0040fe3fdd679e0fc95be1f8a8babe3f2b902ebabfea1381bf52cd1b54",
         amount: 8323200,
@@ -40,7 +40,7 @@ describe('AbstractHDElectrumWallet.cosign', () => {
       {
         height: 198350,
         value: 10000000,
-        address: "dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk",
+        address: "dc1qvtztrf6zpxffxgfeewd9aq2ytzuny5yjepecen",
         vout: 1,
         txid: "615174140e35fa06044c75165ca41c8bbeffb81185845e3df1d9c51d9b7580cd",
         amount: 10000000,
@@ -55,7 +55,7 @@ describe('AbstractHDElectrumWallet.cosign', () => {
       {
         height: 591862,
         value: 26000,
-        address: '3C5iv2Hp6nfuhkfTZibb7GJPkXj367eurD',
+        address: '6VZxBkWzXYdhzX2Brq3hnQ6f8KYRDYNa4y',
         txid: 'fe9c4d1b240f270e9cda227c48e29b2983cb26aaab183b34454871d5d9acc987',
         vout: 0,
         amount: 26000,
