@@ -105,7 +105,7 @@ const About: React.FC = () => {
           <BlueTextCentered>{loc.settings.about_awesome} 👍</BlueTextCentered>
           <BlueSpacing20 />
           <BlueTextCentered>React Native</BlueTextCentered>
-          <BlueTextCentered>bitcoinjs-lib</BlueTextCentered>
+          <BlueTextCentered>@doichain/doichainjs-lib</BlueTextCentered>
           <BlueTextCentered>Nodejs</BlueTextCentered>
           <BlueTextCentered>Electrum server</BlueTextCentered>
           <BlueSpacing20 />

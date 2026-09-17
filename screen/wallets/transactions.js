@@ -23,7 +23,7 @@ import BlueClipboard from '../../blue_modules/clipboard';
 import { isDesktop } from '../../blue_modules/environment';
 import * as fs from '../../blue_modules/fs';
 import triggerHapticFeedback, { HapticFeedbackTypes } from '../../blue_modules/hapticFeedback';
-import { LightningCustodianWallet, MultisigHDWallet, WatchOnlyWallet } from '../../class';
+import { MultisigHDWallet, WatchOnlyWallet } from '../../class';
 import WalletGradient from '../../class/wallet-gradient';
 import presentAlert, { AlertType } from '../../components/Alert';
 import { FButton, FContainer } from '../../components/FloatButtons';
@@ -488,26 +488,27 @@ const WalletTransactions = ({ navigation }) => {
         onManageFundsPressed={id => {
           if (wallet.type === MultisigHDWallet.type) {
             navigateToViewEditCosigners();
-          } else if (wallet.type === LightningCustodianWallet.type) {
-            if (wallet.getUserHasSavedExport()) {
-              onManageFundsPressed({ id });
-            } else {
-              presentWalletExportReminder()
-                .then(async () => {
-                  wallet.setUserHasSavedExport(true);
-                  await saveToDisk();
-                  onManageFundsPressed({ id });
-                })
-                .catch(() => {
-                  navigate('WalletExportRoot', {
-                    screen: 'WalletExport',
-                    params: {
-                      walletID: wallet.getID(),
-                    },
-                  });
-                });
-            }
-          }
+           } 
+          //else if (wallet.type === LightningCustodianWallet.type) {
+          //   if (wallet.getUserHasSavedExport()) {
+          //     onManageFundsPressed({ id });
+          //   } else {
+          //     presentWalletExportReminder()
+          //       .then(async () => {
+          //         wallet.setUserHasSavedExport(true);
+          //         await saveToDisk();
+          //         onManageFundsPressed({ id });
+          //       })
+          //       .catch(() => {
+          //         navigate('WalletExportRoot', {
+          //           screen: 'WalletExport',
+          //           params: {
+          //             walletID: wallet.getID(),
+          //           },
+          //         });
+          //       });
+          //   }
+          // }
         }}
       />
       <View style={[styles.list, stylesHook.list]}>

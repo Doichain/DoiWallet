@@ -20,7 +20,7 @@ struct WalletInformationWidgetProvider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (WalletInformationWidgetEntry) -> ()) {
         let entry: WalletInformationWidgetEntry
         if (context.isPreview) {
-            entry = WalletInformationWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 10000), allWalletsBalance: WalletData(balance: 1000000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
+          entry = WalletInformationWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 10000, volume: "0", percent: 0.00), allWalletsBalance: WalletData(balance: 1000000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
         } else {
             entry = WalletInformationWidgetEntry(date: Date(), marketData: emptyMarketData)
         }
@@ -36,7 +36,7 @@ struct WalletInformationWidgetProvider: TimelineProvider {
             let entry: WalletInformationWidgetEntry
 
             if let result = result {
-                entry = WalletInformationWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "", sats: "", price: result.formattedRate ?? "!", rate: result.rateDouble), allWalletsBalance: allwalletsBalance)
+              entry = WalletInformationWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "", sats: "", price: result.formattedRate ?? "!", rate: result.rateDouble, volume: "", percent: 0.00), allWalletsBalance: allwalletsBalance)
                 WalletInformationWidgetProvider.lastSuccessfulEntries.append(entry)
                 if WalletInformationWidgetProvider.lastSuccessfulEntries.count > 5 {
                     WalletInformationWidgetProvider.lastSuccessfulEntries.removeFirst()
@@ -63,7 +63,7 @@ struct WalletInformationWidgetEntry: TimelineEntry {
 
 extension WalletInformationWidgetEntry {
     static var placeholder: WalletInformationWidgetEntry {
-        WalletInformationWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 10000), allWalletsBalance: WalletData(balance: 1000000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
+      WalletInformationWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 10000, volume: "", percent: 0.00), allWalletsBalance: WalletData(balance: 1000000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
     }
 }
 
@@ -85,9 +85,10 @@ struct WalletInformationWidget: Widget {
     let kind: String = "WalletInformationWidget"
 
     var body: some WidgetConfiguration {
-        if #available(iOSApplicationExtension 16.0, *) {
+        if #available(iOSApplicationExtension 17.0, *) {
             return StaticConfiguration(kind: kind, provider: WalletInformationWidgetProvider()) { entry in
                 WalletInformationWidgetEntryView(entry: entry)
+                    .containerBackground(.regularMaterial, for: .widget)
             }
             .configurationDisplayName("Balance")
             .description("View your accumulated balance.").supportedFamilies([.systemSmall])
@@ -105,7 +106,7 @@ struct WalletInformationWidget: Widget {
 
 struct WalletInformationWidget_Previews: PreviewProvider {
     static var previews: some View {
-        WalletInformationWidgetEntryView(entry: WalletInformationWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: Double(0)), allWalletsBalance: WalletData(balance: 0, latestTransactionTime: LatestTransaction(isUnconfirmed: nil, epochValue: nil))))
+      WalletInformationWidgetEntryView(entry: WalletInformationWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: Double(0), volume: "", percent: 0.00), allWalletsBalance: WalletData(balance: 0, latestTransactionTime: LatestTransaction(isUnconfirmed: nil, epochValue: nil))))
             .previewContext(WidgetPreviewContext(family: .systemSmall))
     }
 }

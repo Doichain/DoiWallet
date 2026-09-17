@@ -28,7 +28,6 @@ import {
   WatchOnlyWallet,
 } from '../../class';
 import { AbstractHDElectrumWallet } from '../../class/wallets/abstract-hd-electrum-wallet';
-import { LightningCustodianWallet } from '../../class/wallets/lightning-custodian-wallet';
 import presentAlert from '../../components/Alert';
 import Button from '../../components/Button';
 import HeaderRightButton from '../../components/HeaderRightButton';
@@ -488,12 +487,12 @@ const WalletDetails = () => {
                 </>
               )}
 
-              {wallet.type === LightningCustodianWallet.type && (
+              {/* {wallet.type === LightningCustodianWallet.type && (
                 <>
                   <Text style={[styles.textLabel1, stylesHook.textLabel1]}>{loc.wallets.details_connected_to.toLowerCase()}</Text>
                   <BlueText>{wallet.getBaseURI()}</BlueText>
                 </>
-              )}
+              )} */}
 
               {wallet.type === HDAezeedWallet.type && (
                 <>

@@ -5,9 +5,9 @@ import { ContactList } from '../../class/contact-list';
 describe('ContactList', () => {
   it('isAddressValid()', () => {
     const cl = new ContactList();
-    assert.ok(cl.isAddressValid('3BDsBDxDimYgNZzsqszNZobqQq3yeUoJf2'));
-    assert.ok(cl.isAddressValid('bc1quuafy8htjjj263cvpj7md84magzmc8svmh8lrm'));
-    assert.ok(cl.isAddressValid('BC1QH6TF004TY7Z7UN2V5NTU4MKF630545GVHS45U7'));
+    assert.ok(cl.isAddressValid('N5ac3ywbkm11zVrtUfBFkRPhcjAygsc3SP'));
+    assert.ok(cl.isAddressValid('dc1qvtztrf6zpxffxgfeewd9aq2ytzuny5yjepecen'));
+    
 
     assert.ok(!cl.isAddressValid('sfhsdhsdf'));
   });

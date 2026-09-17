@@ -36,9 +36,7 @@
     "network": "Σφάλμα δικτύου"
   },
   "lnd": {
-    "errorInvoiceExpired": "Το τιμολόγιο έληξε",
     "expired": "Έληξε",
-    "expiresIn": "Λήγει σε {time} λεπτά",
     "payButton": "Πληρωμή",
     "payment": "Πληρωμή",
     "placeholder": "Τιμολόγιο ή διεύθυνση",

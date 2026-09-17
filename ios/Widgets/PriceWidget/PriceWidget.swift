@@ -14,13 +14,13 @@ struct PriceWidgetProvider: TimelineProvider {
   static var lastSuccessfulEntry: PriceWidgetEntry?
   
   func placeholder(in context: Context) -> PriceWidgetEntry {
-    return PriceWidgetEntry(date: Date(), family: context.family, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData)
+    return PriceWidgetEntry(date: Date(), family: context.family, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, volume: "...", percent: 0.00, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData)
   }
   
   func getSnapshot(in context: Context, completion: @escaping (PriceWidgetEntry) -> ()) {
     let entry: PriceWidgetEntry
     if context.isPreview {
-      entry = PriceWidgetEntry(date: Date(), family: context.family, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData)
+      entry = PriceWidgetEntry(date: Date(), family: context.family, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, volume:"...", percent: 0.00, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData)
     } else {
       entry = PriceWidgetEntry(date: Date(), family: context.family, currentMarketData: emptyMarketData, previousMarketData: emptyMarketData)
     }
@@ -31,7 +31,7 @@ struct PriceWidgetProvider: TimelineProvider {
     var entries: [PriceWidgetEntry] = []
     
     if context.isPreview {
-      let entry = PriceWidgetEntry(date: Date(), family: context.family, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData)
+      let entry = PriceWidgetEntry(date: Date(), family: context.family, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, volume: "...", percent: 0.00, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData)
       entries.append(entry)
       let timeline = Timeline(entries: entries, policy: .atEnd)
       completion(timeline)
@@ -41,9 +41,12 @@ struct PriceWidgetProvider: TimelineProvider {
         Currency.saveNewSelectedCurrency()
       }
       
+      
       MarketAPI.fetchPrice(currency: userPreferredCurrency) { (data, error) in
-        if let data = data, let formattedRate = data.formattedRate {
-          let currentMarketData = MarketData(nextBlock: "", sats: "", price: formattedRate, rate: data.rateDouble, dateString: data.lastUpdate)
+               
+        if let data = data, let formattedRate = data.formattedRate, let formattedVolume = data.formattedVolume {
+          
+          let currentMarketData = MarketData(nextBlock: "", sats: "", price: formattedRate, rate: data.rateDouble, volume: formattedVolume, percent: data.percent, dateString: data.lastUpdate)
           
           // Retrieve previous market data from the last entry, if available
           let previousEntry = PriceWidgetProvider.lastSuccessfulEntry
@@ -99,9 +102,10 @@ struct PriceWidget: Widget {
   let kind: String = "PriceWidget"
   
   var body: some WidgetConfiguration {
-    if #available(iOSApplicationExtension 16.0, *) {
+    if #available(iOSApplicationExtension 17.0, *) {
       return StaticConfiguration(kind: kind, provider: PriceWidgetProvider()) { entry in
         PriceWidgetEntryView(entry: entry)
+          .containerBackground(.regularMaterial, for: .widget)
       }
       .configurationDisplayName("Price")
       .description("View the current price of Bitcoin.")
@@ -122,14 +126,14 @@ struct PriceWidget: Widget {
 struct PriceWidget_Previews: PreviewProvider {
   static var previews: some View {
     Group {
-      PriceWidgetEntryView(entry: PriceWidgetEntry(date: Date(), family: .systemSmall, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
+      PriceWidgetEntryView(entry: PriceWidgetEntry(date: Date(), family: .systemSmall, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000,volume: "...", percent: 0.00,dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
         .previewContext(WidgetPreviewContext(family: .systemSmall))
-      if #available(iOSApplicationExtension 16.0, *) {
-        PriceWidgetEntryView(entry: PriceWidgetEntry(date: Date(), family: .accessoryCircular, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
+      if #available(iOSApplicationExtension 17.0, *) {
+        PriceWidgetEntryView(entry: PriceWidgetEntry(date: Date(), family: .accessoryCircular, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000,volume: "...",percent: 0.00, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
           .previewContext(WidgetPreviewContext(family: .accessoryCircular))
-        PriceWidgetEntryView(entry: PriceWidgetEntry(date: Date(), family: .accessoryInline, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
+        PriceWidgetEntryView(entry: PriceWidgetEntry(date: Date(), family: .accessoryInline, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000,volume: "...",percent: 0.00, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
           .previewContext(WidgetPreviewContext(family: .accessoryInline))
-        PriceWidgetEntryView(entry: PriceWidgetEntry(date: Date(), family: .accessoryRectangular, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
+        PriceWidgetEntryView(entry: PriceWidgetEntry(date: Date(), family: .accessoryRectangular, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000,volume: "...",percent: 0.00, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
           .previewContext(WidgetPreviewContext(family: .accessoryRectangular))
       }
     }

@@ -966,9 +966,9 @@ const SendDetails = () => {
     navigation.navigate('PaymentCodeList', { walletID: wallet.getID() });
   };
 
-  const handlePsbtSign = async (weOwnWallet: string | undefined) => {    
+  const handlePsbtSign = async (weOwnWallet?: string | undefined | TWallet) => {    
     const actWallet =  wallet?.type !== undefined  ? wallet : weOwnWallet;
-    if (!actWallet) return; // Early return if no wallet is available
+    if (!actWallet || typeof actWallet === 'string') return; // Early return if no wallet is available
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 100)); // sleep for animations
 
@@ -978,20 +978,23 @@ const SendDetails = () => {
 
 
     let tx;
-    let psbt;
+    let psbt = new bitcoin.Psbt({ network: DOICHAIN });
     let updatedTxOutputs;
     // we need to remove change address from recipients, so that Confirm screen show more accurate info
     const changeAddresses: string[] = [];
-    // @ts-ignore hacky
-    for (let c = 0; c < actWallet.next_free_change_address_index + actWallet.gap_limit; c++) {
-        // @ts-ignore hacky
+    // @ts-ignore hacky    
+    for (let c = 0; c < actWallet.next_free_address_index + actWallet.gap_limit; c++) {
+      // @ts-ignore hacky 
       changeAddresses.push(actWallet._getInternalAddressByIndex(c));
     }
-
+    
+    
     // Liste für die externen Adressen (falls relevant)
     const externalAddresses: string[] = [];
     // Externe Adressen generieren (optional)
+    // @ts-ignore hacky 
     for (let c = 0; c < actWallet.next_free_address_index + actWallet.gap_limit; c++) {
+      // @ts-ignore hacky 
       externalAddresses.push(actWallet._getExternalAddressByIndex(c));
     }
 
@@ -1001,13 +1004,13 @@ const SendDetails = () => {
       updatedTxOutputs = psbt.txOutputs.map((output, index) => {
         const chunks = bitcoin.script.decompile(output.script);
         let address = output.address; //TODO check if this is segwit if so make an error message
-          if(chunks[0] === 90){ //make this const and support also name_new, name_update, name_firstupdate
+        if (chunks && chunks[0] === 90){ //make this const and support also name_new, name_update, name_firstupdate
             psbt.setVersion(VERSION);
             try { 
                 let isIncluded = changeAddresses.includes(String(address)) || externalAddresses.includes(String(address)) ? true : false;
                 const utf16Decoder = new TextDecoder('ascii');
-                const nameId = utf16Decoder.decode(Buffer.from(chunks[1], 'hex'));
-                const nameValue = utf16Decoder.decode(Buffer.from(chunks[2], 'hex'));
+              const nameId = utf16Decoder.decode(Buffer.from(chunks[1].toString(), 'hex'));
+              const nameValue = utf16Decoder.decode(Buffer.from(chunks[2].toString(), 'hex'));
               return { ...output, nameId, nameValue, isIncluded};
             } catch (e) {
               console.log('error during decode', e);
@@ -1043,9 +1046,9 @@ const SendDetails = () => {
       fee: tx?new BigNumber(psbt.getFee()).dividedBy(100000000).toNumber():0,
       feeSatoshi: tx?psbt.getFee():0,
       wallet: actWallet,
-      tx: tx?tx.toHex():0,
+      tx: tx?tx.toHex():'0',
       recipients,
-      satoshiPerByte: tx?psbt.getFeeRate():0,
+      satoshiPerByte: tx ? psbt.getFeeRate():0,
       showAnimatedQr: true,
       psbt,
     });

@@ -49,7 +49,6 @@
     "network": "Ошибка сети"
   },
   "lnd": {
-    "errorInvoiceExpired": "Инвойс просрочен.",
     "expired": "Истекший",
     "expiresIn": "Истекает через {time} мин",
     "payButton": "Оплатить",

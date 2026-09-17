@@ -12,7 +12,7 @@ import {
 } from '@keystonehq/bc-ur-registry/dist';
 import { decodeUR as origDecodeUr, encodeUR as origEncodeUR, extractSingleWorkload as origExtractSingleWorkload } from '../bc-ur/dist';
 import { MultisigCosigner, MultisigHDWallet } from '../../class';
-import { Psbt } from 'bitcoinjs-lib';
+import { Psbt } from '@doichain/doichainjs-lib';
 
 const USE_UR_V1 = 'USE_UR_V1';
 

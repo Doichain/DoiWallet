@@ -7,12 +7,12 @@ import navigationStyle, { CloseButtonPosition } from '../components/navigationSt
 import { useTheme } from '../components/themes';
 import { useExtendedNavigation } from '../hooks/useExtendedNavigation';
 import loc from '../loc';
-import LNDViewAdditionalInvoiceInformation from '../screen/lnd/lndViewAdditionalInvoiceInformation';
-import LNDViewAdditionalInvoicePreImage from '../screen/lnd/lndViewAdditionalInvoicePreImage';
-import LNDViewInvoice from '../screen/lnd/lndViewInvoice';
-import LnurlAuth from '../screen/lnd/lnurlAuth';
-import LnurlPay from '../screen/lnd/lnurlPay';
-import LnurlPaySuccess from '../screen/lnd/lnurlPaySuccess';
+//import LNDViewAdditionalInvoiceInformation from '../screen/lnd/lndViewAdditionalInvoiceInformation';
+//import LNDViewAdditionalInvoicePreImage from '../screen/lnd/lndViewAdditionalInvoicePreImage';
+// import LNDViewInvoice from '../screen/lnd/lndViewInvoice';
+// import LnurlAuth from '../screen/lnd/lnurlAuth';
+// import LnurlPay from '../screen/lnd/lnurlPay';
+// import LnurlPaySuccess from '../screen/lnd/lnurlPaySuccess';
 import Broadcast from '../screen/send/Broadcast';
 import IsItMyAddress from '../screen/send/isItMyAddress';
 import Success from '../screen/send/success';
@@ -39,7 +39,7 @@ import {
   GeneralSettingsComponent,
   LanguageComponent,
   LicensingComponent,
-  LightningSettingsComponent,
+  //LightningSettingsComponent,
   NetworkSettingsComponent,
   NotificationSettingsComponent,
   PlausibleDeniabilityComponent,
@@ -50,9 +50,9 @@ import {
   ToolsComponent,
 } from './LazyLoadSettingsStack';
 import PaymentCodesListComponent from './LazyLoadPaymentCodeStack';
-import LNDCreateInvoiceRoot from './LNDCreateInvoiceStack';
+// import LNDCreateInvoiceRoot from './LNDCreateInvoiceStack';
 import ReceiveDetailsStackRoot from './ReceiveDetailsStack';
-import ScanLndInvoiceRoot from './ScanLndInvoiceStack';
+// import ScanLndInvoiceRoot from './ScanLndInvoiceStack';
 import ScanQRCodeStackRoot from './ScanQRCodeStack';
 import SendDetailsStack from './SendDetailsStack';
 import SignVerifyStackRoot from './SignVerifyStack';
@@ -177,7 +177,7 @@ const DetailViewStackScreensStack = () => {
         component={SelectWallet}
         options={navigationStyle({ title: loc.wallets.select_wallet })(theme)}
       />
-      <DetailViewStack.Screen
+      {/* <DetailViewStack.Screen
         name="LNDViewInvoice"
         component={LNDViewInvoice}
         options={navigationStyle({
@@ -187,8 +187,8 @@ const DetailViewStackScreensStack = () => {
             backgroundColor: theme.colors.customHeader,
           },
         })(theme)}
-      />
-      <DetailViewStack.Screen
+      /> */}
+      {/* <DetailViewStack.Screen
         name="LNDViewAdditionalInvoiceInformation"
         component={LNDViewAdditionalInvoiceInformation}
         options={navigationStyle({ title: loc.lndViewInvoice.additional_info })(theme)}
@@ -197,7 +197,7 @@ const DetailViewStackScreensStack = () => {
         name="LNDViewAdditionalInvoicePreImage"
         component={LNDViewAdditionalInvoicePreImage}
         options={navigationStyle({ title: loc.lndViewInvoice.additional_info })(theme)}
-      />
+      /> */}
 
       <DetailViewStack.Screen
         name="Broadcast"
@@ -214,21 +214,21 @@ const DetailViewStackScreensStack = () => {
         component={GenerateWord}
         options={navigationStyle({ title: loc.autofill_word.title })(theme)}
       />
-      <DetailViewStack.Screen
+      {/* <DetailViewStack.Screen
         name="LnurlPay"
         component={LnurlPay}
         options={navigationStyle({
           title: '',
           closeButtonPosition: CloseButtonPosition.Right,
         })(theme)}
-      />
+      /> */}
       <DetailViewStack.Screen
         name="PaymentCodeList"
         component={PaymentCodesListComponent}
         options={navigationStyle({ title: loc.bip47.contacts })(theme)}
       />
 
-      <DetailViewStack.Screen
+      {/* <DetailViewStack.Screen
         name="LnurlPaySuccess"
         component={LnurlPaySuccess}
         options={navigationStyle({
@@ -237,8 +237,8 @@ const DetailViewStackScreensStack = () => {
           headerBackVisible: false,
           gestureEnabled: false,
         })(theme)}
-      />
-      <DetailViewStack.Screen name="LnurlAuth" component={LnurlAuth} options={navigationStyle({ title: '' })(theme)} />
+      /> */}
+      {/* <DetailViewStack.Screen name="LnurlAuth" component={LnurlAuth} options={navigationStyle({ title: '' })(theme)} /> */}
       <DetailViewStack.Screen
         name="Success"
         component={Success}
@@ -255,8 +255,8 @@ const DetailViewStackScreensStack = () => {
 
       <DetailViewStack.Screen name="AddWalletRoot" component={AddWalletStack} options={NavigationFormModalOptions} />
       <DetailViewStack.Screen name="SendDetailsRoot" component={SendDetailsStack} options={NavigationDefaultOptions} />
-      <DetailViewStack.Screen name="LNDCreateInvoiceRoot" component={LNDCreateInvoiceRoot} options={NavigationDefaultOptions} />
-      <DetailViewStack.Screen name="ScanLndInvoiceRoot" component={ScanLndInvoiceRoot} options={NavigationDefaultOptions} />
+      {/* <DetailViewStack.Screen name="LNDCreateInvoiceRoot" component={LNDCreateInvoiceRoot} options={NavigationDefaultOptions} /> */}
+      {/* <DetailViewStack.Screen name="ScanLndInvoiceRoot" component={ScanLndInvoiceRoot} options={NavigationDefaultOptions} /> */}
       <DetailViewStack.Screen name="AztecoRedeemRoot" component={AztecoRedeemStackRoot} options={NavigationDefaultOptions} />
       {/* screens */}
       <DetailViewStack.Screen
@@ -329,11 +329,11 @@ const DetailViewStackScreensStack = () => {
         component={LanguageComponent}
         options={navigationStyle({ title: loc.settings.language })(theme)}
       />
-      <DetailViewStack.Screen
+      {/* <DetailViewStack.Screen
         name="LightningSettings"
         component={LightningSettingsComponent}
         options={navigationStyle({ title: loc.settings.lightning_settings })(theme)}
-      />
+      /> */}
       <DetailViewStack.Screen
         name="NotificationSettings"
         component={NotificationSettingsComponent}

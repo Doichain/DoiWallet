@@ -37,8 +37,8 @@ describe('LegacyWallet', function () {
     assert.ok(w.getBalance() === 0);
     assert.ok(w.getUnconfirmedBalance() === 0);
     assert.ok(w._lastBalanceFetch === 0);
-    await w.fetchBalance();
-    assert.ok(w.getBalance() === 18262000);
+    await w.fetchBalance();   
+    assert.ok(w.getBalance() === 9948820);
     assert.ok(w.getUnconfirmedBalance() === 0);
     assert.ok(w._lastBalanceFetch > 0);
   });

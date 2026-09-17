@@ -13,13 +13,13 @@ struct MarketWidgetProvider: TimelineProvider {
   static var lastSuccessfulEntry: MarketWidgetEntry?
 
   func placeholder(in context: Context) -> MarketWidgetEntry {
-    return MarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10 000", rate: 10000))
+    return MarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10 000", rate: 10000, volume: "", percent: 0.00))
   }
   
   func getSnapshot(in context: Context, completion: @escaping (MarketWidgetEntry) -> ()) {
     let entry: MarketWidgetEntry
     if (context.isPreview) {
-      entry = MarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10 000", rate: 10000))
+      entry = MarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10 000", rate: 10000, volume: "", percent: 0.00))
     } else {
       entry = MarketWidgetEntry(date: Date(), marketData: emptyMarketData)
     }
@@ -29,7 +29,7 @@ struct MarketWidgetProvider: TimelineProvider {
   func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
       var entries: [MarketWidgetEntry] = []
       if context.isPreview {
-        let entry = MarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10 000", rate: 10000))
+        let entry = MarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10 000", rate: 10000, volume: "", percent: 0.00))
         entries.append(entry)
         let timeline = Timeline(entries: entries, policy: .atEnd)
         completion(timeline)
@@ -81,9 +81,10 @@ struct MarketWidget: Widget {
   let kind: String = "MarketWidget"
   
   var body: some WidgetConfiguration {
-    if #available(iOSApplicationExtension 16.0, *) {
+    if #available(iOSApplicationExtension 17.0, *) {
       return StaticConfiguration(kind: kind, provider: MarketWidgetProvider()) { entry in
         MarketWidgetEntryView(entry: entry)
+          .containerBackground(.regularMaterial, for: .widget)
       }
       .configurationDisplayName("Market")
       .description("View the current market information.").supportedFamilies([.systemSmall])
@@ -101,7 +102,7 @@ struct MarketWidget: Widget {
 
 struct MarketWidget_Previews: PreviewProvider {
   static var previews: some View {
-    MarketWidgetEntryView(entry: MarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 0)))
+    MarketWidgetEntryView(entry: MarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 0, volume: "", percent: 0.00)))
       .previewContext(WidgetPreviewContext(family: .systemSmall))
   }
 }

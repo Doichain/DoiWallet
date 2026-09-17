@@ -49,7 +49,6 @@
   },
   "lnd": {
     "expired": "منتهية الصلاحية",
-    "expiresIn": "تنتهي بعد {time} دقيقة",
     "payButton": "دفع",
     "placeholder": "عنوان أو برقية",
     "potentialFee": "الرسوم المحتملة: {fee}",

@@ -177,8 +177,8 @@ const ManageWallets: React.FC = () => {
       );
 
       const filteredOrder: Item[] = [
-        ...filteredWallets.map(wallet => ({ type: ItemType.WalletSection, data: wallet })),
-        ...filteredTransactions.map(tx => ({ type: ItemType.TransactionSection, data: tx })),
+        ...filteredWallets.map(wallet => ({ type: ItemType.WalletSection, data: wallet } as WalletItem)),
+        ...filteredTransactions.map(tx => ({ type: ItemType.TransactionSection, data: tx } as TransactionItem)),
       ];
 
       dispatch({ type: SET_WALLET_DATA, payload: filteredWallets });
@@ -246,7 +246,7 @@ const ManageWallets: React.FC = () => {
     // eslint-disable-next-line react/no-unused-prop-types
     ({ item, drag, isActive }: { item: Item; drag: () => void; isActive: boolean }) => {
       if (item.type === ItemType.TransactionSection && item.data) {
-        const w = wallets.find(wallet => wallet.getTransactions().some((tx: ExtendedTransaction) => tx.hash === item.data.hash));
+        const w = wallets.find(wallet => wallet.getTransactions().some((tx: Transaction) => (tx as ExtendedTransaction).hash === item.data.hash));
         const walletID = w ? w.getID() : '';
         return (
           <TransactionListItem

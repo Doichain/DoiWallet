@@ -9,7 +9,7 @@ import { DOICHAIN } from '../../blue_modules/network.js';
 const ECPair = ECPairFactory(ecc);
 
 export class SegwitBech32Wallet extends LegacyWallet {
-  static readonly type = 'segwitBech32';
+  static readonly type = 'segwitBech32'; 
   static readonly typeReadable = 'P2 WPKH';
   // @ts-ignore: override
   public readonly type = SegwitBech32Wallet.type;

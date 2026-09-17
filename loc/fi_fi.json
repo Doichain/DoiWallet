@@ -51,9 +51,7 @@
     "network": "Verkkovirhe"
   },
   "lnd": {
-    "errorInvoiceExpired": "Lasku vanheni.",
     "expired": "Erääntynyt",
-    "expiresIn": "Vanhenee {time} minuutissa",
     "payButton": "Maksa",
     "payment": "Maksu",
     "placeholder": "Lasku",

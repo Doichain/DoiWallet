@@ -41,7 +41,6 @@
   },
   "lnd": {
     "expired": "만료되었습니다",
-    "expiresIn": "{time}분 뒤 무효화됩니다",
     "payButton": "지불하기",
     "refill": "재충전",
     "refill_create": "진행을 위해서 재충전할 수있는 비트코인 지갑을 만들어주세요.",

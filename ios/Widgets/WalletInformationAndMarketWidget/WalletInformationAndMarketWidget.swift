@@ -20,7 +20,7 @@ struct WalletInformationAndMarketWidgetProvider: TimelineProvider {
     func getSnapshot(in context: Context, completion: @escaping (WalletInformationAndMarketWidgetEntry) -> ()) {
         let entry: WalletInformationAndMarketWidgetEntry
         if (context.isPreview) {
-            entry = WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 10000), allWalletsBalance: WalletData(balance: 1000000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
+            entry = WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 10000, volume: "...", percent: 0), allWalletsBalance: WalletData(balance: 1000000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
         } else {
             entry = WalletInformationAndMarketWidgetEntry(date: Date(), marketData: emptyMarketData)
         }
@@ -30,7 +30,7 @@ struct WalletInformationAndMarketWidgetProvider: TimelineProvider {
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
         var entries: [WalletInformationAndMarketWidgetEntry] = []
         if (context.isPreview) {
-            let entry = WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 10000), allWalletsBalance: WalletData(balance: 1000000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
+            let entry = WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 10000, volume: "...", percent: 0), allWalletsBalance: WalletData(balance: 1000000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
             entries.append(entry)
             let timeline = Timeline(entries: entries, policy: .atEnd)
             completion(timeline)
@@ -66,7 +66,7 @@ struct WalletInformationAndMarketWidgetEntry: TimelineEntry {
     let date: Date
     let marketData: MarketData
     var allWalletsBalance: WalletData = WalletData(balance: 0)
-    static var placeholder = WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "...", sats: "...", price: "...", rate: 0), allWalletsBalance: WalletData(balance: 0, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
+    static var placeholder = WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "...", sats: "...", price: "...", rate: 0, volume: "...", percent: 0), allWalletsBalance: WalletData(balance: 0, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)))
 }
 
 struct WalletInformationAndMarketWidgetEntryView: View {
@@ -112,21 +112,32 @@ struct WalletInformationAndMarketWidgetEntryView: View {
 struct WalletInformationAndMarketWidget: Widget {
     let kind: String = "WalletInformationAndMarketWidget"
 
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: WalletInformationAndMarketWidgetProvider()) { entry in
-            WalletInformationAndMarketWidgetEntryView(entry: entry)
-        }
-        .configurationDisplayName("Wallet and Market")
-        .description("View your total wallet balance and network prices.").supportedFamilies([.systemMedium, .systemLarge])
-        .contentMarginsDisabledIfAvailable()
+  var body: some WidgetConfiguration {
+    
+    if #available(iOSApplicationExtension 17.0, *) {
+      return StaticConfiguration(kind: kind, provider: WalletInformationAndMarketWidgetProvider()) { entry in
+        WalletInformationAndMarketWidgetEntryView(entry: entry)
+          .containerBackground(.regularMaterial, for: .widget)
+      }
+      .configurationDisplayName("Wallet and Market")
+      .description("View your total wallet balance and network prices.").supportedFamilies([.systemMedium, .systemLarge])
+      .contentMarginsDisabledIfAvailable()
+    } else {
+      return StaticConfiguration(kind: kind, provider: WalletInformationAndMarketWidgetProvider()) { entry in
+        WalletInformationAndMarketWidgetEntryView(entry: entry)
+      }
+      .configurationDisplayName("Wallet and Market")
+      .description("View your total wallet balance and network prices.").supportedFamilies([.systemMedium, .systemLarge])
+      .contentMarginsDisabledIfAvailable()
     }
+  }
 }
 
 struct WalletInformationAndMarketWidget_Previews: PreviewProvider {
     static var previews: some View {
-        WalletInformationAndMarketWidgetEntryView(entry: WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 0), allWalletsBalance: WalletData(balance: 10000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000))))
+        WalletInformationAndMarketWidgetEntryView(entry: WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 0, volume: "...", percent: 0), allWalletsBalance: WalletData(balance: 10000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000))))
             .previewContext(WidgetPreviewContext(family: .systemMedium))
-        WalletInformationAndMarketWidgetEntryView(entry: WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 0), allWalletsBalance: WalletData(balance: 10000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000))))
+        WalletInformationAndMarketWidgetEntryView(entry: WalletInformationAndMarketWidgetEntry(date: Date(), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: 0, volume: "...", percent: 0), allWalletsBalance: WalletData(balance: 10000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000))))
             .previewContext(WidgetPreviewContext(family: .systemLarge))
     }
 }

@@ -127,23 +127,32 @@ struct PriceView: View {
   }
   
   private var defaultView: some View {
-    VStack(alignment: .trailing, spacing: nil, content: {
-      Text("Last Updated").font(Font.system(size: 11, weight: .regular)).foregroundColor(Color(UIColor.lightGray))
+    VStack(alignment: .trailing, spacing: nil, content: {    
       HStack(alignment: .lastTextBaseline, spacing: nil, content: {
-        Text(entry.currentMarketData?.formattedDate ?? "").lineLimit(1).foregroundColor(.primary).font(Font.system(size: 13, weight: .regular)).minimumScaleFactor(0.01).transition(.opacity)
+        Text( "Updated: \( entry.currentMarketData?.formattedDate ?? "")").lineLimit(1).foregroundColor(.primary).font(Font.system(size: 13, weight: .regular)).minimumScaleFactor(0.01).transition(.opacity)
       })
       Spacer()
       VStack(alignment: .trailing, spacing: 16, content: {
         HStack(alignment: .lastTextBaseline, spacing: nil, content: {
-          Text(entry.currentMarketData?.price ?? "").lineLimit(1).foregroundColor(.primary).font(Font.system(size: 28, weight: .bold)).minimumScaleFactor(0.01).transition(.opacity)
+          Text("DOI: \( entry.currentMarketData?.price ?? "")").lineLimit(1).foregroundColor(.primary).font(Font.system(size: 28, weight: .bold)).minimumScaleFactor(0.01).transition(.opacity)
         })
-        if let previousMarketDataPrice = entry.previousMarketData?.price, let currentMarketDataRate = entry.currentMarketData?.rate, let previousMarketDataRate = entry.previousMarketData?.rate, previousMarketDataRate > 0, currentMarketDataRate != previousMarketDataRate {
+
+        if let currentMarketDataVolume = entry.currentMarketData?.volume {
+          
           HStack(alignment: .lastTextBaseline, spacing: nil, content: {
-            Image(systemName: currentMarketDataRate > previousMarketDataRate ? "arrow.up" : "arrow.down")
-            Text("from").lineLimit(1).foregroundColor(.primary).font(Font.system(size: 13, weight: .regular)).minimumScaleFactor(0.01)
-            Text(previousMarketDataPrice).lineLimit(1).foregroundColor(.primary).font(Font.system(size: 13, weight: .regular)).minimumScaleFactor(0.01)
+            Text("Volume 24h: \(currentMarketDataVolume)").lineLimit(1).foregroundColor(.primary).font(Font.system(size: 13, weight: .regular)).minimumScaleFactor(0.01)            
           }).transition(.slide)
         }
+
+        if let  currentMarketDataPercent = entry.currentMarketData?.percent{
+          let stringVolume = String(currentMarketDataPercent)
+          HStack(alignment: .lastTextBaseline, spacing: nil, content: {
+            Text("Change 24h: ").lineLimit(1).foregroundColor(.primary).font(Font.system(size: 13, weight: .regular)).minimumScaleFactor(0.01)
+            Image(systemName: currentMarketDataPercent  > 0 ? "arrow.up" : "arrow.down")
+            Text("\(stringVolume)%").lineLimit(1).foregroundColor(.primary).font(Font.system(size: 13, weight: .regular)).minimumScaleFactor(0.01)
+           
+          }).transition(.slide)
+        }        
       })
     }).frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .trailing).padding()
   }
@@ -173,14 +182,14 @@ struct PriceView: View {
 struct PriceView_Previews: PreviewProvider {
   static var previews: some View {
     Group {
-      PriceView(entry: PriceWidgetEntry(date: Date(), family: .systemSmall, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
+      PriceView(entry: PriceWidgetEntry(date: Date(), family: .systemSmall, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, volume: "", percent: 0.00, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
         .previewContext(WidgetPreviewContext(family: .systemSmall)).padding()
-      if #available(iOSApplicationExtension 16.0, *) {
-        PriceView(entry: PriceWidgetEntry(date: Date(), family: .accessoryCircular, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
+      if #available(iOSApplicationExtension 17.0, *) {
+        PriceView(entry: PriceWidgetEntry(date: Date(), family: .accessoryCircular, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, volume: "",percent: 0.00, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
           .previewContext(WidgetPreviewContext(family: .accessoryCircular))
-        PriceView(entry: PriceWidgetEntry(date: Date(), family: .accessoryInline, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
+        PriceView(entry: PriceWidgetEntry(date: Date(), family: .accessoryInline, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, volume: "",percent: 0.00, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
           .previewContext(WidgetPreviewContext(family: .accessoryInline))
-        PriceView(entry: PriceWidgetEntry(date: Date(), family: .accessoryRectangular, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
+        PriceView(entry: PriceWidgetEntry(date: Date(), family: .accessoryRectangular, currentMarketData: MarketData(nextBlock: "", sats: "", price: "$10,000", rate: 10000, volume: "",percent: 0.00,dateString: "2019-09-18T17:27:00+00:00"), previousMarketData: emptyMarketData))
           .previewContext(WidgetPreviewContext(family: .accessoryRectangular))
       }
     }

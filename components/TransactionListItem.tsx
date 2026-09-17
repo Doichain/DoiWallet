@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { Linking, View, ViewStyle } from 'react-native';
+import { Image, Linking, View, ViewStyle } from 'react-native';
 import Lnurl from '../class/lnurl';
-import { LightningTransaction, Transaction } from '../class/wallets/types';
+import {Transaction } from '../class/wallets/types';
+import { NameOpTransaction, NameOpOutput } from '../types/transaction';
 import TransactionExpiredIcon from '../components/icons/TransactionExpiredIcon';
 import TransactionIncomingIcon from '../components/icons/TransactionIncomingIcon';
 import TransactionOffchainIcon from '../components/icons/TransactionOffchainIcon';
@@ -24,11 +25,12 @@ import { useStorage } from '../hooks/context/useStorage';
 import ToolTipMenu from './TooltipMenu';
 import { CommonToolTipActions } from '../typings/CommonToolTipActions';
 import { pop } from '../NavigationService';
+import { getIPFSImageUrl } from '../utils/ipfs';
 
 interface TransactionListItemProps {
   itemPriceUnit: DoichainUnit;
   walletID: string;
-  item: Transaction & LightningTransaction; // using type intersection to have less issues with ts
+  item: Transaction & Partial<NameOpTransaction>; // using type intersection to have less issues with ts
   searchQuery?: string;
   style?: ViewStyle;
   renderHighlightedText?: (text: string, query: string) => JSX.Element;
@@ -72,14 +74,24 @@ export const TransactionListItem: React.FC<TransactionListItemProps> = React.mem
     if (item.counterparty) {
       counterparty = counterpartyMetadata?.[item.counterparty]?.label ?? item.counterparty;
     }
+
     const txMemo = (counterparty ? `[${shortenContactName(counterparty)}] ` : '') + (txMetadata[item.hash]?.memo ?? '');
     const subtitle = useMemo(() => {
-      let sub = Number(item.confirmations) < 7 ? loc.formatString(loc.transactions.list_conf, { number: item.confirmations }) : '';
+      let sub = '';
+      // Check for nameOp with IPFS URL
+      for (const output of item.outputs || []) {
+        if (output?.scriptPubKey?.nameOp) {          
+          sub = `[${output.scriptPubKey.nameOp.name}] `;
+          break;
+        }
+      }
+      sub += Number(item.confirmations) < 7 ? loc.formatString(loc.transactions.list_conf, { number: item.confirmations }) : '';
       if (sub !== '') sub += ' ';
+      
       sub += txMemo;
       if (item.memo) sub += item.memo;
       return sub || undefined;
-    }, [txMemo, item.confirmations, item.memo]);
+    }, [txMemo, item.confirmations, item.memo, item.outputs]);
 
     const rowTitle = useMemo(() => {
       if (item.type === 'user_invoice' || item.type === 'payment_request') {
@@ -133,7 +145,72 @@ export const TransactionListItem: React.FC<TransactionListItemProps> = React.mem
       };
     }, [item, colors.foregroundColor, colors.successColor]);
 
+    const [ipfsImageUrl, setIpfsImageUrl] = useState<string | null>(null);
+    const [isLoadingImage, setIsLoadingImage] = useState<boolean>(false);
+    const [imageError, setImageError] = useState<Error | null>(null);
+
+    useEffect(() => {
+      const fetchIPFSImage = async () => {
+        if (!item.outputs) return;
+        
+        for (const output of item.outputs) {
+          const scriptPubKey = output?.scriptPubKey;
+          if (scriptPubKey?.nameOp?.value?.startsWith('ipfs://')) {
+            try {
+              setIsLoadingImage(true);
+              setImageError(null);
+              const imageUrl = await getIPFSImageUrl(scriptPubKey.nameOp.value);
+              if (imageUrl) {
+                setIpfsImageUrl(imageUrl);
+                break;
+              }
+            } catch (error) {
+              console.warn('Error fetching IPFS image:', error);
+              setImageError(error instanceof Error ? error : new Error('Failed to fetch IPFS image'));
+            } finally {
+              setIsLoadingImage(false);
+            }
+          }
+        }
+      };
+
+      fetchIPFSImage();
+    }, [item.outputs]);
+
     const determineTransactionTypeAndAvatar = () => {
+      // Check for nameOp transactions with IPFS images
+      const hasNameOpWithIpfs = (item as NameOpTransaction)?.outputs?.some(output => {
+        const scriptPubKey = output?.scriptPubKey;
+        return scriptPubKey?.nameOp?.value?.startsWith('ipfs://');
+      });
+
+      if (hasNameOpWithIpfs) {
+        if (isLoadingImage) {
+          return {
+            label: loc.transactions.onchain,
+            icon: <TransactionPendingIcon />, // Use pending icon while loading
+          };
+        }
+
+        if (imageError || !ipfsImageUrl) {
+          return {
+            label: loc.transactions.onchain,
+            icon: <TransactionOnchainIcon />, // Fallback to onchain icon on error
+          };
+        }
+
+        return {
+          label: loc.transactions.onchain,
+          icon: (
+            <Image
+              source={{ uri: ipfsImageUrl }}
+              style={{ width: 32, height: 32, borderRadius: 16 }}
+              onError={() => setImageError(new Error('Failed to load image'))}
+            />
+          ),
+        };
+      }
+
       if (item.category === 'receive' && item.confirmations! < 3) {
         return {
           label: loc.transactions.pending_transaction,

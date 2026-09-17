@@ -38,7 +38,6 @@
   },
   "lnd": {
     "expired": "Tamat tempoh",
-    "expiresIn": "Tamat tempoh dalam {time} minit",
     "payButton": "Bayar",
     "refill": "Isi semula",
     "refill_create": "Untuk meneruskan, sila buat dompet Bitcoin untuk diisi semula.",

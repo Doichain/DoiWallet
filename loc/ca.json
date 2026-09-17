@@ -49,7 +49,6 @@
   },
   "lnd": {
     "expired": "Caducat",
-    "expiresIn": "Caduca en {time} minuts",
     "payButton": "Pagar",
     "payment": "Pagament",
     "placeholder": "Factura o adreça",

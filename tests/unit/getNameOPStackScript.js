@@ -1,4 +1,4 @@
-import { address, script } from 'bitcoinjs-lib';
+import { address, script } from '@doichain/doichainjs-lib';
 
 export const NAME_MAX_LENGTH = 255
 export const VALUE_MAX_LENGTH = 520

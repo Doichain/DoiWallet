@@ -14,11 +14,12 @@ struct CurrencyError: LocalizedError {
 
 class Currency {
   
-  static func getUserPreferredCurrency() -> String {
-
+  static func getUserPreferredCurrency() -> String {    
+     
     guard let userDefaults = UserDefaults(suiteName: UserDefaultsGroupKey.GroupName.rawValue),
           let preferredCurrency = userDefaults.string(forKey: "preferredCurrency")
     else {
+     
       return "USD"
     }
 
@@ -27,7 +28,6 @@ class Currency {
       UserDefaults.standard.removeObject(forKey: WidgetData.WidgetDataStoreKey)
       UserDefaults.standard.synchronize()
     }
-
     return preferredCurrency
   }
 

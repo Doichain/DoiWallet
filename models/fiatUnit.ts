@@ -48,14 +48,21 @@ const RateExtractors = {
   CoinGecko: async (ticker: string): Promise<number> => {
     let json;
     try {
+      console.log(`Fetching CoinGecko price for ticker: ${ticker}`);
       const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=doichain&vs_currencies=${ticker.toLowerCase()}`);
-      json = await res.json();       
+      json = await res.json();
+      console.log('CoinGecko API response:', json);       
     } catch (e: any) {
+      console.error(`CoinGecko API error for ${ticker}:`, e);
       throw new Error(`Could not update rate for ${ticker}: ${e.message}`);
     }
     const rate = json?.doichain?.[ticker] || json?.doichain?.[ticker.toLowerCase()];
-
-    if (!rate) throw new Error(`Could not update rate for ${ticker}: data is wrong`);
+    
+    if (!rate) {
+      console.error(`Invalid rate data for ${ticker}:`, json);
+      throw new Error(`Could not update rate for ${ticker}: data is wrong`);
+    }
+    console.log(`Successfully got rate for ${ticker}:`, rate);
     return rate;
   },
   Bitstamp: async (ticker: string): Promise<number> => {
@@ -199,16 +206,17 @@ const RateExtractors = {
     if (!(rate >= 0)) throw new Error(`Could not update rate for ${ticker}: data is wrong`);
     return rate;
 */
-    let json; 
+    let json;
+    
     try {
-      const res = await fetch(`https://api.coinpaprika.com/v1/coins/doi-doicoin/ohlcv/latest`);
+      const res = await fetch(`https://api.coinpaprika.com/v1/tickers/doi-doicoin?quotes=${ticker}`);
       json = await res.json();
-      //let aaa = json.body.map((p: TFiatUnits) => p.close);
       
     } catch (e: any) {
       throw new Error(`Could not update rate  ${e.message}`);
     }
-    let rate = json[0].close;    
+    let rate = json.quotes[ticker]?.price
+   
     if (!rate) throw new Error(`Could not update rate for ${ticker}: data is wrong`);
 
     rate = Number(rate);

@@ -52,13 +52,9 @@
     "network": "Netzwerkfehler"
   },
   "lnd": {
-    "errorInvoiceExpired": "Rechnung verfallen.",
     "expired": "Abgelaufen",
-    "expiresIn": "Läuft in {time} Minuten ab",
-    "payButton": "Zahlen",
     "payment": "Zahlung",
     "placeholder": "Rechnung oder Adresse",
-    "potentialFee": "Geschätzte Gebühr: {fee}",
     "refill": "Aufladen",
     "refill_create": "Bitte eine Bitcoin Wallet erstellen um fortzufahren",
     "refill_external": "Mit externem Wallet aufladen",
@@ -368,7 +364,10 @@
     "txid": "Transaktions-ID",
     "from": "Von: {counterparty}",
     "to": "Zu: {counterparty}",
-    "updating": "Aktualisiere...."
+    "updating": "Aktualisiere....",
+    "nameOps_name": "Name",
+    "nameOps_value": "Value",
+    "nameOps_description": "Description"
   },
   "wallets": {
     "add_bitcoin": "Doi",

@@ -21,7 +21,7 @@ import SafeArea from '../../components/SafeArea';
 import { satoshiToBTC, satoshiToLocalCurrency } from '../../blue_modules/currency';
 const BlueElectrum = require('../../blue_modules/BlueElectrum');
 const Bignumber = require('bignumber.js');
-const bitcoin = require('bitcoinjs-lib');
+const bitcoin = require('@doichain/doichainjs-lib');
 
 const Confirm = () => {
   const { wallets, fetchAndSaveWalletTransactions, isElectrumDisabled } = useContext(BlueStorageContext);

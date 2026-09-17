@@ -52,7 +52,6 @@
     "network": "Erro na rede"
   },
   "lnd": {
-    "errorInvoiceExpired": "Fatura expirada",
     "expired": "Expirada",
     "expiresIn": "Expira em {time} minutos",
     "payButton": "Pagar",

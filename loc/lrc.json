@@ -26,7 +26,6 @@
     "network": "ختا شبکه"
   },
   "lnd": {
-    "errorInvoiceExpired": "سۊرت هساو مونقزی بیه.",
     "expired": "مونقزی بیه",
     "payButton": "پرداخت",
     "payment": "پرداخت",

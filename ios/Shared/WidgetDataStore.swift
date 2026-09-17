@@ -13,17 +13,30 @@ struct WidgetDataStore: Codable {
   let rate: String
   let lastUpdate: String
   let rateDouble: Double
+  let volume: Double
+  let percent: Double
   var formattedRate: String? {
     let numberFormatter = NumberFormatter()
     numberFormatter.locale = Locale(identifier: Currency.getUserPreferredCurrencyLocale())
     numberFormatter.numberStyle = .currency
-    numberFormatter.maximumFractionDigits = 0
-    numberFormatter.minimumFractionDigits = 0
+    numberFormatter.maximumFractionDigits = 3
+    numberFormatter.minimumFractionDigits = 3
     if let rateString = numberFormatter.string(from: NSNumber(value: rateDouble)) {
       return rateString
     }
     return rate
   }
+  var formattedVolume: String? {
+    let numberFormatter = NumberFormatter()
+    numberFormatter.locale = Locale(identifier: Currency.getUserPreferredCurrencyLocale())
+    numberFormatter.numberStyle = .currency
+    numberFormatter.maximumFractionDigits = 0
+    numberFormatter.minimumFractionDigits = 0
+    if let volumeString = numberFormatter.string(from: NSNumber(value: volume)) {
+      return volumeString
+    }
+    return String(volume)
+  } 
   var formattedRateForSmallComplication: String? {
     return rateDouble.abbreviated
   }
@@ -59,4 +72,3 @@ struct WidgetDataStore: Codable {
     return nil
   }
 }
-

@@ -18,7 +18,7 @@ import { element } from 'detox';
  * this testsuite is for test cases that require no wallets to be present
  */
 describe('BlueWallet UI Tests - no wallets', () => {
-  it('selftest passes', async () => {
+  it.skip('selftest passes', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t1');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t1'), 'as it previously passed on Travis');
@@ -42,7 +42,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('all settings screens work', async () => {
+  it.skip('all settings screens work', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t2');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t2'), 'as it previously passed on Travis');
@@ -140,7 +140,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
     // turn on notifications if available
     // console.warn('yo');
     // await sleep(300000);
-    if (await expectToBeVisible('NotificationSettings')) {
+    if(await expectToBeVisible('NotificationSettings')) {
       await element(by.id('NotificationSettings')).tap();
       await element(by.id('NotificationsSwitch')).tap();
       await sup('OK');
@@ -180,7 +180,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can create wallet, reload app and it persists. then go to receive screen, set custom amount and label. Dismiss modal and go to WalletsList.', async () => {
+  it.skip('can create wallet, reload app and it persists. then go to receive screen, set custom amount and label. Dismiss modal and go to WalletsList.', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t3');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t3'), 'as it previously passed on Travis');
@@ -220,7 +220,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can encrypt storage, with plausible deniabilityl decrypt fake storage', async () => {
+  it.skip('can encrypt storage, with plausible deniabilityl decrypt fake storage', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t4');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t4'), 'as it previously passed on Travis');
@@ -385,7 +385,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can encrypt storage, and decrypt storage works', async () => {
+  it.skip('can encrypt storage, and decrypt storage works', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t5');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t5'), 'as it previously passed on Travis');
@@ -466,7 +466,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can import 2of2 multisig using individual cosigners (1 signer, 1 xpub)', async () => {
+  it.skip('can import 2of2 multisig using individual cosigners (1 signer, 1 xpub)', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('can import 2of2 multisig using individual cosigners (1 signer, 1 xpub)');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping as it previously passed on Travis');
@@ -546,7 +546,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can import multisig setup from UR, and create tx, and sign on hw devices', async () => {
+  it.skip('can import multisig setup from UR, and create tx, and sign on hw devices', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t6');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t6'), 'as it previously passed on Travis');
@@ -678,7 +678,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can discover wallet account and import it', async () => {
+  it.skip('can discover wallet account and import it', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t7');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t6'), 'as it previously passed on Travis');

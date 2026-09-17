@@ -41,9 +41,7 @@
     "network": "Hálózati hiba"
   },
   "lnd": {
-    "errorInvoiceExpired": "A számla lejárt.",
     "expired": "Lejárt",
-    "expiresIn": "{time} percen belül elévül",
     "payButton": "Fizess",
     "placeholder": "Számla",
     "potentialFee": "Várható díj: {fee}",

@@ -41,7 +41,6 @@
   },
   "lnd": {
     "expired": "Utløpt",
-    "expiresIn": "Utløper om {time} minutter",
     "payButton": "Betal",
     "refill": "Fyll på",
     "refill_create": "For å fortsette må du lage en Bitcoin-lommebok du kan fylle på med.",

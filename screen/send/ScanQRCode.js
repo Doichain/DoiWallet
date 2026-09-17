@@ -1,6 +1,6 @@
 import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import LocalQRCode from '@remobile/react-native-qrcode-local-image';
-import * as bitcoin from 'bitcoinjs-lib';
+import * as bitcoin from '@doichain/doichainjs-lib';
 import createHash from 'create-hash';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, Platform, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';

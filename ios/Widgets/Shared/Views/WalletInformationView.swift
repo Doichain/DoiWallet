@@ -45,7 +45,7 @@ struct WalletInformationView: View {
           Text(formattedBalance).lineLimit(1).foregroundColor(.textColor).font(Font.system(size:28, weight: .bold, design: .default)).minimumScaleFactor(0.01)
       Spacer()
         
-              Text("Latest transactionaaa").font(Font.system(size: 11, weight: .regular, design: .default)).foregroundColor(.textColorLightGray)
+              Text("Latest transaction").font(Font.system(size: 11, weight: .regular, design: .default)).foregroundColor(.textColorLightGray)
               Text(formattedLatestTransactionTime).lineLimit(1).foregroundColor(.textColor).font(Font.system(size:13, weight: .regular, design: .default)).minimumScaleFactor(0.01)
         
       }).frame(minWidth: 0,
@@ -58,7 +58,7 @@ struct WalletInformationView: View {
 
 struct WalletInformationView_Previews: PreviewProvider {
   static var previews: some View {
-    WalletInformationView(allWalletsBalance: WalletData(balance: 10000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: Double(13000)))
+    WalletInformationView(allWalletsBalance: WalletData(balance: 10000, latestTransactionTime: LatestTransaction(isUnconfirmed: false, epochValue: 1568804029000)), marketData: MarketData(nextBlock: "26", sats: "9 134", price: "$10,000", rate: Double(13000), volume: "", percent: 0.00))
       .previewContext(WidgetPreviewContext(family: .systemSmall))
   }
 }

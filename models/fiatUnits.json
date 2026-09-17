@@ -106,7 +106,7 @@
     },
     "EUR": {
         "endPointKey": "EUR",
-        "locale": "en-IE",
+        "locale": "de-DE",
         "source": "Coinpaprika",
         "symbol": "€",
         "country": "European Union (Euro)"

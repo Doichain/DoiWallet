@@ -2,7 +2,7 @@ import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navig
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, InteractionManager, ScrollView, StyleSheet, View, LayoutChangeEvent } from 'react-native';
 import { BlueCard, BlueSpacing20, BlueText } from '../../BlueComponents';
-import { LegacyWallet, LightningCustodianWallet, SegwitBech32Wallet, SegwitP2SHWallet, WatchOnlyWallet } from '../../class';
+import { LegacyWallet, SegwitBech32Wallet, SegwitP2SHWallet, WatchOnlyWallet } from '../../class';
 import CopyTextToClipboard from '../../components/CopyTextToClipboard';
 import HandOffComponent from '../../components/HandOffComponent';
 import QRCodeComponent from '../../components/QRCodeComponent';
@@ -106,7 +106,7 @@ const WalletExport: React.FC = () => {
             <QRCodeComponent isMenuAvailable={false} value={s} size={qrCodeSize} logoSize={70} />
             {wallet.type !== WatchOnlyWallet.type && <BlueText style={stylesHook.warning}>{loc.wallets.warning_do_not_disclose}</BlueText>}
             <BlueSpacing20 />
-            {wallet.type === LightningCustodianWallet.type || wallet.type === WatchOnlyWallet.type ? (
+            {wallet.type === WatchOnlyWallet.type ? (
               <CopyTextToClipboard text={s} />
             ) : (
               <BlueText style={[styles.secret, styles.secretWritingDirection, stylesHook.secret]} testID="Secret">

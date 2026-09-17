@@ -68,6 +68,7 @@ const TransactionDetails = () => {
   const { saveToDisk, txMetadata, counterpartyMetadata, wallets, getTransactions } = useStorage();
   const [from, setFrom] = useState<string[]>([]);
   const [to, setTo] = useState<string[]>([]);
+  const [nameOps, setNameOps] = useState<{ name: string; value: string }[]>([]);  
   const [isLoading, setIsLoading] = useState(true);
   const [tx, setTX] = useState<Transaction>();
   const [memo, setMemo] = useState<string>('');
@@ -119,6 +120,7 @@ const TransactionDetails = () => {
         let foundTx: Transaction | false = false;
         let newFrom: string[] = [];
         let newTo: string[] = [];
+        let newNameOps: string[] = [];        
         for (const transaction of getTransactions(undefined, Infinity, true)) {
           if (transaction.hash === hash) {
             foundTx = transaction;
@@ -127,6 +129,13 @@ const TransactionDetails = () => {
             }
             for (const output of foundTx.outputs) {
               if (output?.scriptPubKey?.addresses) newTo = newTo.concat(output.scriptPubKey.addresses);
+              
+              if (output?.scriptPubKey?.nameOp){
+                const nameOpArray = output.scriptPubKey.nameOp;
+                //const nameOpArray = Object.keys(output.scriptPubKey.nameOp.entries());
+                //const nameOpArray = Array.from(output.scriptPubKey.nameOp.keys());
+                newNameOps = newNameOps.concat(nameOpArray);
+              }
             }
           }
         }
@@ -152,6 +161,8 @@ const TransactionDetails = () => {
         setTX(foundTx);
         setFrom(newFrom);
         setTo(newTo);
+        //setNameOps(newNameOps.map(name => ({ name, value: '' }))); 
+        setNameOps(newNameOps); 
         setIsLoading(false);
       });
       return () => {
@@ -244,7 +255,7 @@ const TransactionDetails = () => {
       }
 
       fromArray.push(
-        <ToolTipMenu key={address} isButton title={address} isMenuPrimaryAction actions={actions} onPressMenuItem={onPressMenuItem}>
+        <ToolTipMenu key={index} isButton title={address} isMenuPrimaryAction actions={actions} onPressMenuItem={onPressMenuItem}>
           <BlueText style={isWeOwnAddress ? [styles.rowValue, styles.weOwnAddress] : styles.rowValue}>
             {address}
             {index === array.length - 1 ? null : ','}
@@ -304,9 +315,9 @@ const TransactionDetails = () => {
           <>
             <View style={styles.rowHeader}>
               <BlueText style={styles.rowCaption}>{loc.transactions.details_to}</BlueText>
-              <CopyToClipboardButton stringToCopy={to.filter(onlyUnique).join(', ')} />
+              <CopyToClipboardButton stringToCopy={to.join(', ')} />
             </View>
-            {renderSection(arrDiff(from, to.filter(onlyUnique)))}
+            {renderSection( to)}
             <View style={styles.marginBottom18} />
           </>
         )}
@@ -346,6 +357,21 @@ const TransactionDetails = () => {
             <View style={styles.marginBottom18} />
           </>
         )}
+
+        {nameOps.length > 0 && (
+          <>            
+            {nameOps.map((nameOp: { name: string, value: string }, index: number) => (
+              <React.Fragment key={index}>
+                <BlueText style={styles.rowCaption}>{loc.transactions.nameOps_name}: {nameOp.name}</BlueText>
+                
+                <BlueText style={styles.rowCaption}>{loc.transactions.nameOps_value}: {nameOp.value}</BlueText>
+                <BlueText style={styles.rowValue}> </BlueText>
+              </React.Fragment>
+            ))}
+            <View style={styles.marginBottom18} />
+          </>
+        )}
+
         <ToolTipMenu
           isButton
           actions={toolTipMenuActions}

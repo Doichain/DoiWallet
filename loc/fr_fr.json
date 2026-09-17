@@ -43,9 +43,7 @@
     "network": "Erreur réseau"
   },
   "lnd": {
-    "errorInvoiceExpired": "Requête expirée.",
     "expired": "Expiré",
-    "expiresIn": "Expire dans {time} minutes",
     "payButton": "Payer",
     "placeholder": "Facture ou adresse",
     "potentialFee": "Frais potentiels : {fee}",

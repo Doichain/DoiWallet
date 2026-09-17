@@ -79,7 +79,7 @@ describe('P2SH Segwit HD (BIP49)', () => {
     hd._xpub = ypub;
     assert.strictEqual('6VK9EzDRN1cZg7QfsXMqjvZs82d92oPakR', hd._getExternalAddressByIndex(0));
     assert.strictEqual('6JWuDoaTuZUHa5zZKATXH1gCU3oEDA63fh', hd._getExternalAddressByIndex(1));
-    assert.strictEqual('6Fgbx51xc17MHWjT6vZi1fQcDergSMMtaN', hd._getInternalAddressByIndex(0));
+    assert.strictEqual('6TcU3xkecDMHpjS1tDoBUpbtzv2PYRYVEJ', hd._getInternalAddressByIndex(0));
     assert.ok(hd.getAllExternalAddresses().includes('6VK9EzDRN1cZg7QfsXMqjvZs82d92oPakR'));
     assert.ok(hd.getAllExternalAddresses().includes('6JWuDoaTuZUHa5zZKATXH1gCU3oEDA63fh'));
     assert.ok(!hd.getAllExternalAddresses().includes('32yn5CdevZQLk3ckuZuA8fEKBco8mEkLei')); // not internal

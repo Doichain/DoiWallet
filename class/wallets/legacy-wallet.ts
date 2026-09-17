@@ -316,6 +316,7 @@ export class LegacyWallet extends AbstractWallet {
             ...txRest,
             inputs: [...vin2],
             outputs: [...vout],
+           
           };
 
           _txsByExternalIndex.push(clonedTx);
@@ -329,6 +330,7 @@ export class LegacyWallet extends AbstractWallet {
             ...txRest,
             inputs: [...vin],
             outputs: [...vout2],
+           
           };
 
           _txsByExternalIndex.push(clonedTx);

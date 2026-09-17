@@ -52,9 +52,7 @@
     "network": "ネットワークエラー"
   },
   "lnd": {
-    "errorInvoiceExpired": "インボイス失効",
     "expired": "失効",
-    "expiresIn": "失効まで{time}分",
     "payButton": "支払う",
     "payment": "支払い",
     "placeholder": "インボイスまたはアドレス",

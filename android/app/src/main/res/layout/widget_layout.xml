@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="8dp"
+    android:padding="6dp"
     android:background="@drawable/widget_background"
     android:gravity="end">
 
@@ -18,17 +18,17 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:gravity="end">
         <TextView
             android:id="@+id/last_updated_label"
             style="@style/WidgetTextSecondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Last Updated"
-            android:textSize="12sp"
+            android:text="Updated: "
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="6dp"
             android:visibility="gone"/>
 
         <TextView
@@ -37,55 +37,92 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text=""
-            android:textSize="12sp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginTop="2dp"
+            android:textSize="10sp"
+            android:layout_marginEnd="6dp"
+            
             android:visibility="gone"/>
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:gravity="end">
 
+        <TextView
+            android:id="@+id/coin_name"
+            style="@style/WidgetTextPrimary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="" 
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginRight="4dp"
+            android:layout_marginBottom="4dp"/>
         <TextView
             android:id="@+id/price_value"
             style="@style/WidgetTextPrimary"
             android:layout_width="wrap_content"
-android:layout_height="wrap_content"
-android:text=""
-android:textSize="24sp"
-android:textStyle="bold"
-android:layout_marginEnd="8dp"
-android:layout_marginBottom="8dp"
-android:visibility="gone"/>
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="4dp"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone"/>
+    </LinearLayout>
     <LinearLayout
-        android:id="@+id/price_arrow_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end">
+
+        <TextView
+            android:id="@+id/volume_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="" 
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+        <TextView
+            android:id="@+id/volume"            
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="4dp"
+            android:visibility="gone"/>
+    </LinearLayout>   
+    <LinearLayout
+        android:id="@+id/percent_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="end"
-        android:visibility="gone">
-
-        <ImageView
-            android:id="@+id/price_arrow"
+       >
+       <TextView
+            android:id="@+id/change_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
-            android:layout_marginBottom="8dp"/>
+            android:text="" 
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
 
         <TextView
-            android:id="@+id/previous_price_label"
-            style="@style/WidgetTextPrimary"
+            android:id="@+id/percent_arrow"            
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="From:"
+            style="@style/WidgetTextPrimary"
+            android:text=""
             android:textSize="12sp"
             android:layout_marginEnd="8dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginBottom="8dp"/>    
         <TextView
-            android:id="@+id/previous_price"
+            android:id="@+id/percent"
             style="@style/WidgetTextPrimary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -93,5 +130,5 @@ android:visibility="gone"/>
             android:textSize="12sp"
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"/>
-    </LinearLayout></LinearLayout>
+    </LinearLayout>
 </LinearLayout>

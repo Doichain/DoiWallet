@@ -1,5 +1,5 @@
 import bip21, { TOptions } from 'bip21';
-import * as bitcoin from 'bitcoinjs-lib';
+import * as bitcoin from '@doichain/doichainjs-lib';
 import URL from 'url';
 
 import { readFileOutsideSandbox } from '../blue_modules/fs';

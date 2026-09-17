@@ -18,7 +18,7 @@ import {
 import A from '../../blue_modules/analytics';
 import triggerHapticFeedback, { HapticFeedbackTypes } from '../../blue_modules/hapticFeedback';
 import { BlueButtonLink, BlueFormLabel, BlueSpacing20, BlueSpacing40, BlueText } from '../../BlueComponents';
-import { BlueApp, HDSegwitBech32Wallet, HDSegwitP2SHWallet, LightningCustodianWallet, SegwitP2SHWallet } from '../../class';
+import { BlueApp, HDSegwitBech32Wallet, HDSegwitP2SHWallet, SegwitP2SHWallet } from '../../class';
 import presentAlert from '../../components/Alert';
 import Button from '../../components/Button';
 import ListItem from '../../components/ListItem';
@@ -202,7 +202,7 @@ const WalletsAdd: React.FC = () => {
     setIsLoading(true);
 
     if (selectedWalletType === ButtonSelected.OFFCHAIN) {
-      createLightningWallet();
+     // createLightningWallet();
     } else if (selectedWalletType === ButtonSelected.ONCHAIN) {
       let w: HDSegwitBech32Wallet | SegwitP2SHWallet | HDSegwitP2SHWallet;
       if (selectedIndex === 2) {
@@ -253,45 +253,45 @@ const WalletsAdd: React.FC = () => {
     }
   };
 
-  const createLightningWallet = async () => {
-    const wallet = new LightningCustodianWallet();
-    wallet.setLabel(label || loc.wallets.details_title);
+  // const createLightningWallet = async () => {
+  //   const wallet = new LightningCustodianWallet();
+  //   wallet.setLabel(label || loc.wallets.details_title);
 
-    try {
-      const lndhub = walletBaseURI?.trim();
-      if (lndhub) {
-        const isValidNodeAddress = await LightningCustodianWallet.isValidNodeAddress(lndhub);
-        if (isValidNodeAddress) {
-          wallet.setBaseURI(lndhub);
-          await wallet.init();
-        } else {
-          throw new Error('The provided node address is not valid LNDHub node.');
-        }
-      }
-      await wallet.createAccount();
-      await wallet.authorize();
-    } catch (Err: any) {
-      setIsLoading(false);
-      console.warn('lnd create failure', Err);
-      if (Err.message) {
-        return presentAlert({ message: Err.message });
-      } else {
-        return presentAlert({ message: loc.wallets.add_lndhub_error });
-      }
-      // giving app, not adding anything
-    }
-    A(A.ENUM.CREATED_LIGHTNING_WALLET);
-    await wallet.generate();
-    addWallet(wallet);
-    await saveToDisk();
+  //   try {
+  //     const lndhub = walletBaseURI?.trim();
+  //     if (lndhub) {
+  //       const isValidNodeAddress = await LightningCustodianWallet.isValidNodeAddress(lndhub);
+  //       if (isValidNodeAddress) {
+  //         wallet.setBaseURI(lndhub);
+  //         await wallet.init();
+  //       } else {
+  //         throw new Error('The provided node address is not valid LNDHub node.');
+  //       }
+  //     }
+  //     await wallet.createAccount();
+  //     await wallet.authorize();
+  //   } catch (Err: any) {
+  //     setIsLoading(false);
+  //     console.warn('lnd create failure', Err);
+  //     if (Err.message) {
+  //       return presentAlert({ message: Err.message });
+  //     } else {
+  //       return presentAlert({ message: loc.wallets.add_lndhub_error });
+  //     }
+  //     // giving app, not adding anything
+  //   }
+  //   A(A.ENUM.CREATED_LIGHTNING_WALLET);
+  //   await wallet.generate();
+  //   addWallet(wallet);
+  //   await saveToDisk();
 
-    A(A.ENUM.CREATED_WALLET);
-    triggerHapticFeedback(HapticFeedbackTypes.NotificationSuccess);
-    // @ts-ignore: Return later to update
-    navigate('PleaseBackupLNDHub', {
-      walletID: wallet.getID(),
-    });
-  };
+  //   A(A.ENUM.CREATED_WALLET);
+  //   triggerHapticFeedback(HapticFeedbackTypes.NotificationSuccess);
+  //   // @ts-ignore: Return later to update
+  //   navigate('PleaseBackupLNDHub', {
+  //     walletID: wallet.getID(),
+  //   });
+  // };
 
   const navigateToEntropy = () => {
     Alert.alert(

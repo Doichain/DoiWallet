@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, TouchableOpacity, StyleSheet, Switch, View
 import { Text } from '@rneui/themed';
 import { PayjoinClient } from 'payjoin-client';
 import BigNumber from 'bignumber.js';
-import * as bitcoin from 'bitcoinjs-lib';
+import * as bitcoin from '@doichain/doichainjs-lib';
 import { BlueText, BlueCard } from '../../BlueComponents';
 import { DoichainUnit} from '../../models/doichainUnits';
 import loc, { formatBalance, formatBalanceWithoutSuffix } from '../../loc';

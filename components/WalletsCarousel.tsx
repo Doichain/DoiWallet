@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { BlueSpacing10 } from '../BlueComponents';
-import { LightningCustodianWallet, MultisigHDWallet } from '../class';
+import { MultisigHDWallet } from '../class';
 import WalletGradient from '../class/wallet-gradient';
 import { useIsLargeScreen } from '../hooks/useIsLargeScreen';
 import loc, { formatBalance, transactionTimeToReadable } from '../loc';
@@ -196,10 +196,7 @@ export const WalletCarouselItem: React.FC<WalletCarouselItemProps> = React.memo(
 
     const opacity = isSelectedWallet === false ? 0.5 : 1.0;
     let image;
-    switch (item.type) {
-      case LightningCustodianWallet.type:
-        image = I18nManager.isRTL ? require('../img/lnd-shape-rtl.png') : require('../img/lnd-shape.png');
-        break;
+    switch (item.type) {      
       case MultisigHDWallet.type:
         image = I18nManager.isRTL ? require('../img/vault-shape-rtl.png') : require('../img/vault-shape.png');
         break;

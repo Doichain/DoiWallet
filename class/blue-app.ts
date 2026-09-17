@@ -17,7 +17,7 @@ import { HDSegwitBech32Wallet } from './wallets/hd-segwit-bech32-wallet';
 import { HDSegwitElectrumSeedP2WPKHWallet } from './wallets/hd-segwit-electrum-seed-p2wpkh-wallet';
 import { HDSegwitP2SHWallet } from './wallets/hd-segwit-p2sh-wallet';
 import { LegacyWallet } from './wallets/legacy-wallet';
-import { LightningCustodianWallet } from './wallets/lightning-custodian-wallet';
+
 import { MultisigHDWallet } from './wallets/multisig-hd-wallet';
 import { SegwitBech32Wallet } from './wallets/segwit-bech32-wallet';
 import { SegwitP2SHWallet } from './wallets/segwit-p2sh-wallet';
@@ -108,7 +108,7 @@ export class BlueApp {
           await AsyncStorage.setItem(key, value);
           await RNSecureKeyStore.remove(key);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
   }
 
@@ -433,33 +433,8 @@ export class BlueApp {
             break;
           case SLIP39SegwitBech32Wallet.type:
             unserializedWallet = SLIP39SegwitBech32Wallet.fromJson(key) as unknown as SLIP39SegwitBech32Wallet;
-            break;
-          case LightningCustodianWallet.type: {
-            unserializedWallet = LightningCustodianWallet.fromJson(key) as unknown as LightningCustodianWallet;
-            let lndhub: false | any = false;
-            try {
-              lndhub = await AsyncStorage.getItem(BlueApp.LNDHUB);
-            } catch (error) {
-              console.warn(error);
-            }
-
-            if (unserializedWallet.baseURI) {
-              unserializedWallet.setBaseURI(unserializedWallet.baseURI); // not really necessary, just for the sake of readability
-              console.log('using saved uri for for ln wallet:', unserializedWallet.baseURI);
-            } else if (lndhub) {
-              console.log('using wallet-wide settings ', lndhub, 'for ln wallet');
-              unserializedWallet.setBaseURI(lndhub);
-            } else {
-              console.log('wallet does not have a baseURI. Continuing init...');
-            }
-            unserializedWallet.init();
-            break;
-          }
-          case 'lightningLdk':
-            // since ldk wallets are deprecated and removed, we need to handle a case when such wallet still exists in storage
-            unserializedWallet = new HDSegwitBech32Wallet();
-            unserializedWallet.setSecret(tempObj.secret.replace('ldk://', ''));
-            break;
+            break;         
+          
           case LegacyWallet.type:
           default:
             unserializedWallet = LegacyWallet.fromJson(key) as unknown as LegacyWallet;
@@ -771,8 +746,8 @@ export class BlueApp {
           await wallet.fetchTransactions();
 
           if ('fetchPendingTransactions' in wallet) {
-            await wallet.fetchPendingTransactions();
-            await wallet.fetchUserInvoices();
+            //await wallet.fetchPendingTransactions();
+            //await wallet.fetchUserInvoices();
           }
         }
       }
@@ -780,8 +755,8 @@ export class BlueApp {
       for (const wallet of this.wallets) {
         await wallet.fetchTransactions();
         if ('fetchPendingTransactions' in wallet) {
-          await wallet.fetchPendingTransactions();
-          await wallet.fetchUserInvoices();
+         // await wallet.fetchPendingTransactions();
+         // await wallet.fetchUserInvoices();
         }
       }
     }
@@ -885,7 +860,7 @@ export class BlueApp {
   isAdvancedModeEnabled = async (): Promise<boolean> => {
     try {
       return !!(await AsyncStorage.getItem(BlueApp.ADVANCED_MODE_ENABLED));
-    } catch (_) {}
+    } catch (_) { }
     return false;
   };
 
@@ -896,7 +871,7 @@ export class BlueApp {
   isHandoffEnabled = async (): Promise<boolean> => {
     try {
       return !!(await AsyncStorage.getItem(BlueApp.HANDOFF_STORAGE_KEY));
-    } catch (_) {}
+    } catch (_) { }
     return false;
   };
 
@@ -917,7 +892,7 @@ export class BlueApp {
           return Boolean(await DefaultPreference.get(BlueApp.DO_NOT_TRACK));
         }
       }
-    } catch (_) {}
+    } catch (_) { }
     const doNotTrackValue = await DefaultPreference.get(BlueApp.DO_NOT_TRACK);
     return doNotTrackValue === '1' || false;
   };

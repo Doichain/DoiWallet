@@ -1,5 +1,5 @@
 import BIP32Factory from 'bip32';
-import * as bitcoin from 'bitcoinjs-lib';
+import * as bitcoin from '@doichain/doichainjs-lib';
 
 import ecc from '../../blue_modules/noble_ecc';
 import { AbstractWallet } from './abstract-wallet';

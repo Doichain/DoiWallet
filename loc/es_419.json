@@ -51,9 +51,7 @@
     "network": "Error de red"
   },
   "lnd": {
-    "errorInvoiceExpired": "Factura caducada.",
     "expired": "Expirado",
-    "expiresIn": "Expira en {time} minutos",
     "payButton": "Pagar",
     "payment": "Pago",
     "placeholder": "Factura o dirección",

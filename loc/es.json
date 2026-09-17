@@ -41,7 +41,6 @@
   },
   "lnd": {
     "expired": "Expirado",
-    "expiresIn": "Expira en {time} minutos",
     "payButton": "Pagar",
     "potentialFee": "Comisión estimada: {fee}",
     "refill": "Recargar",

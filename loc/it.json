@@ -49,7 +49,6 @@
   },
   "lnd": {
     "expired": "Scaduto",
-    "expiresIn": "Scade tra {time} minuti",
     "payButton": "Paga",
     "placeholder": "Fattura o indirizzo",
     "potentialFee": "Commissioni potenziali: {fee}",

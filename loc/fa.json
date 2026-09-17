@@ -49,7 +49,6 @@
   },
   "lnd": {
     "expired": "منقضی‌شده",
-    "expiresIn": "تا {time} دقیقهٔ دیگر منقضی می‌شود",
     "payButton": "پرداخت",
     "payment": "پرداخت",
     "placeholder": "صورت‌حساب یا آدرس",

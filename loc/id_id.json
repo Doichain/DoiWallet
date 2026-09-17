@@ -49,7 +49,6 @@
   },
   "lnd": {
     "expired": "Kadaluarsa",
-    "expiresIn": "Kadaluwarsa dalam {waktu} menit",
     "payButton": "Bayar",
     "potentialFee": "Potensi biaya: {fee}",
     "refill": "Isi ulang",

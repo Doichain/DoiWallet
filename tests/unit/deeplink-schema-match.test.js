@@ -34,7 +34,7 @@ describe.each(['', '//'])('unit - DeepLinkSchemaMatch', function (suffix) {
   });
 
   it('isBitcoin Address', () => {
-    assert.ok(DeeplinkSchemaMatch.isBitcoinAddress("MxvomNTuXMJ6SUz98nEfTE28SHRnCx5UxK"));
+    assert.ok(DeeplinkSchemaMatch.isBitcoinAddress('MxvomNTuXMJ6SUz98nEfTE28SHRnCx5UxK'));
     assert.ok(DeeplinkSchemaMatch.isBitcoinAddress('NKnuDAaxq1sDjR1amrBRVWWpTk1MsG3Fii'));
     assert.ok(DeeplinkSchemaMatch.isBitcoinAddress('dc1qglq9r48zqalradfjlvdq9acy8wfn5227nlfjdk'));
     assert.ok(DeeplinkSchemaMatch.isBitcoinAddress('DC1QGLQ9R48ZQALRADFJLVDQ9ACY8WFN5227NLFJDK'));
@@ -363,7 +363,7 @@ describe.each(['', '//'])('unit - DeepLinkSchemaMatch', function (suffix) {
 
     decoded = DeeplinkSchemaMatch.bip21decode(`DOICHAIN:${suffix}N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e?amount=20.3&label=Foobar`);
     assert.deepStrictEqual(decoded, {
-      address: "N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e",
+      address: 'N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e',
       options: {
         amount: 20.3,
         label: "Foobar",
@@ -373,7 +373,7 @@ describe.each(['', '//'])('unit - DeepLinkSchemaMatch', function (suffix) {
 
   it('encodes bip21', () => {
     let encoded = DeeplinkSchemaMatch.bip21encode('N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e');
-    assert.strictEqual(encoded, "doichain:N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e");
+    assert.strictEqual(encoded, 'doichain:N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e');
     encoded = DeeplinkSchemaMatch.bip21encode('N6dXumt8aJhkAZAnKNzUBNrBJJez2Efu7e', {
       amount: 20.3,
       label: 'Foobar',

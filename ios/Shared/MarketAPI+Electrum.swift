@@ -60,7 +60,7 @@ extension MarketAPI {
                 }
 
                 let fastestFee = calcEstimateFeeFromFeeHistogram(numberOfBlocks: 1, feeHistogram: feeHistogram)
-                let marketData = MarketData(nextBlock: String(format: "%.0f", fastestFee), sats: "0", price: "0", rate: 0)
+                let marketData = MarketData(nextBlock: String(format: "%.0f", fastestFee), sats: "0", price: "0", rate: 0, volume: "0", percent: 0.00)
                 completion(marketData, nil) // Successfully fetched data, return it
             } catch {
                 print("Error receiving data from \(String(describing: settings.host)): \(error.localizedDescription)")
@@ -70,7 +70,7 @@ extension MarketAPI {
     }
 
     static func fetchMarketData(currency: String, completion: @escaping ((MarketData?, Error?) -> Void)) {
-        var marketDataEntry = MarketData(nextBlock: "...", sats: "...", price: "...", rate: 0)
+      var marketDataEntry = MarketData(nextBlock: "...", sats: "...", price: "...", rate: 0, volume: "...", percent: 0.00)
         MarketAPI.fetchPrice(currency: currency, completion: { (result, error) in
             if let result = result {
                 marketDataEntry.rate = result.rateDouble

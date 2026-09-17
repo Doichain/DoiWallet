@@ -52,9 +52,7 @@
     "network": "שגיאת רשת"
   },
   "lnd": {
-    "errorInvoiceExpired": "חשבונית פגה",
     "expired": "פג",
-    "expiresIn": "פג בעוד {time} דקות",
     "payButton": "תשלום",
     "payment": "תשלום",
     "placeholder": "חשבונית או כתובת",

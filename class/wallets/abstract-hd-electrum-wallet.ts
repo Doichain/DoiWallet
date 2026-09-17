@@ -412,6 +412,7 @@ export class AbstractHDElectrumWallet extends AbstractHDWallet {
             this._txs_by_external_index[c] = this._txs_by_external_index[c] || [];
             const { vin: txVin, vout: txVout, ...txRest } = tx;
             const clonedTx = { ...txRest, inputs: txVin.slice(0), outputs: txVout.slice(0) };
+           
 
             // trying to replace tx if it exists already (because it has lower confirmations, for example)
             let replaced = false;
@@ -430,6 +431,7 @@ export class AbstractHDElectrumWallet extends AbstractHDWallet {
             this._txs_by_external_index[c] = this._txs_by_external_index[c] || [];
             const { vin: txVin, vout: txVout, ...txRest } = tx;
             const clonedTx = { ...txRest, inputs: txVin.slice(0), outputs: txVout.slice(0) };
+                   
 
             // trying to replace tx if it exists already (because it has lower confirmations, for example)
             let replaced = false;
@@ -453,6 +455,7 @@ export class AbstractHDElectrumWallet extends AbstractHDWallet {
             this._txs_by_internal_index[c] = this._txs_by_internal_index[c] || [];
             const { vin: txVin, vout: txVout, ...txRest } = tx;
             const clonedTx = { ...txRest, inputs: txVin.slice(0), outputs: txVout.slice(0) };
+         
 
             // trying to replace tx if it exists already (because it has lower confirmations, for example)
             let replaced = false;
@@ -471,6 +474,7 @@ export class AbstractHDElectrumWallet extends AbstractHDWallet {
             this._txs_by_internal_index[c] = this._txs_by_internal_index[c] || [];
             const { vin: txVin, vout: txVout, ...txRest } = tx;
             const clonedTx = { ...txRest, inputs: txVin.slice(0), outputs: txVout.slice(0) };
+         
 
             // trying to replace tx if it exists already (because it has lower confirmations, for example)
             let replaced = false;
@@ -497,6 +501,7 @@ export class AbstractHDElectrumWallet extends AbstractHDWallet {
               this._txs_by_payment_code_index[pc][c] = this._txs_by_payment_code_index[pc][c] || [];
               const { vin: txVin, vout: txVout, ...txRest } = tx;
               const clonedTx = { ...txRest, inputs: txVin.slice(0), outputs: txVout.slice(0) };
+           
 
               // trying to replace tx if it exists already (because it has lower confirmations, for example)
               let replaced = false;
@@ -1532,10 +1537,10 @@ export class AbstractHDElectrumWallet extends AbstractHDWallet {
       }
       console.log('_____cc', cc);
       console.log('_____inputs[cc]', inputs[cc]);
-      const inputAddress = inputs[cc].address;
+      const inputAddress = inputs[cc]?.address;
       const allAddresses = this.getAllExternalAddresses();
 
-      let foundIndex = allAddresses.indexOf(inputAddress);
+      let foundIndex = allAddresses.indexOf(inputAddress || '');
       let internal = false;
 
       for (let c = 0; c < this.next_free_change_address_index + this.gap_limit; c++) {
@@ -1554,15 +1559,15 @@ export class AbstractHDElectrumWallet extends AbstractHDWallet {
 
         const keyPair = ECPair.fromWIF(wif, DOICHAIN);
         try {
-          console.log('____psbt.data.inputs', psbt.data.inputs);
-          console.log('____keyPair', keyPair);
-          console.log('____cc_3', cc);
+         // console.log('____psbt.data.inputs', psbt.data.inputs);
+         // console.log('____keyPair', keyPair);
+         // console.log('____cc_3', cc);
 
           psbt.signInput(cc, keyPair);
-          console.log('____psbt.data.inputs_2', psbt.data.inputs); 
+        //  console.log('____psbt.data.inputs_2', psbt.data.inputs); 
         } catch (e) {
           console.log('___signInput__3', e);
-          throw new Error(e);
+          throw new Error(String(e));
         }
       } else console.log('address of input not found');
     }

@@ -13,6 +13,8 @@ struct MarketData:Codable  {
   var sats: String
   var price: String
   var rate: Double
+  var volume: String
+  var percent: Double 
   var formattedNextBlock: String {
     if nextBlock == "..." {
       return "..."

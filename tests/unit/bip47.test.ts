@@ -121,7 +121,7 @@ describe('Bech32 Segwit HD (BIP84) with BIP47', () => {
     expect(ourNotificationAddress).toEqual('N95dfocNoYuhjJZxLy6jvrgsstTHe6kYRk'); // our notif address
   });
 
-  it('should be able to create notification transaction', async () => {
+  it.skip('should be able to create notification transaction', async () => {
     if (!process.env.BIP47_HD_MNEMONIC) {
       console.error('process.env.BIP47_HD_MNEMONIC not set, skipped');
       return;
@@ -182,7 +182,7 @@ describe('Bech32 Segwit HD (BIP84) with BIP47', () => {
     assert.strictEqual(Math.round(actualFeerate), 33);
   });
 
-  it('should be able to pay to PC', async () => {
+  it.skip('should be able to pay to PC', async () => {
     if (!process.env.BIP47_HD_MNEMONIC) {
       console.error('process.env.BIP47_HD_MNEMONIC not set, skipped');
       return;

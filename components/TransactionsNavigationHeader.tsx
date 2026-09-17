@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Clipboard from '@react-native-clipboard/clipboard';
 import { I18nManager, Image, LayoutAnimation, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { LightningCustodianWallet, MultisigHDWallet } from '../class';
+import {MultisigHDWallet } from '../class';
 import WalletGradient from '../class/wallet-gradient';
 import { TWallet } from '../class/wallets/types';
 import loc, { formatBalance, formatBalanceWithoutSuffix } from '../loc';
@@ -43,26 +43,13 @@ const TransactionsNavigationHeader: React.FC<TransactionsNavigationHeaderProps> 
 
   const menuRef = useRef<ToolTipMenuProps>(null);
 
-  const verifyIfWalletAllowsOnchainAddress = useCallback(() => {
-    if (wallet.type === LightningCustodianWallet.type) {
-      wallet
-        .allowOnchainAddress()
-        .then((value: boolean) => setAllowOnchainAddress(value))
-        .catch((e: Error) => {
-          console.log('This Lndhub wallet does not have an onchain address API.');
-          setAllowOnchainAddress(false);
-        });
-    }
-  }, [wallet]);
+  
 
   useEffect(() => {
     setWallet(initialWallet);
   }, [initialWallet]);
 
-  useEffect(() => {
-    verifyIfWalletAllowsOnchainAddress();
-  }, [wallet, verifyIfWalletAllowsOnchainAddress]);
-
+  
   const handleCopyPress = useCallback(() => {
     const value = formatBalance(wallet.getBalance(), wallet.getPreferredBalanceUnit());
     if (value) {
@@ -176,9 +163,7 @@ const TransactionsNavigationHeader: React.FC<TransactionsNavigationHeaderProps> 
   }, [wallet.hideBalance]);
 
   const imageSource = useMemo(() => {
-    switch (wallet.type) {
-      case LightningCustodianWallet.type:
-        return I18nManager.isRTL ? require('../img/lnd-shape-rtl.png') : require('../img/lnd-shape.png');
+    switch (wallet.type) {     
       case MultisigHDWallet.type:
         return I18nManager.isRTL ? require('../img/vault-shape-rtl.png') : require('../img/vault-shape.png');
       default:
@@ -234,17 +219,7 @@ const TransactionsNavigationHeader: React.FC<TransactionsNavigationHeaderProps> 
           </Text>
         </TouchableOpacity>
       </View>
-      {wallet.type === LightningCustodianWallet.type && allowOnchainAddress && (
-        <ToolTipMenu
-          isMenuPrimaryAction
-          isButton
-          onPressMenuItem={handleManageFundsPressed}
-          actions={toolTipActions}
-          buttonStyle={styles.manageFundsButton}
-        >
-          <Text style={styles.manageFundsButtonText}>{loc.lnd.title}</Text>
-        </ToolTipMenu>
-      )}
+      
       {wallet.type === MultisigHDWallet.type && (
         <TouchableOpacity style={styles.manageFundsButton} accessibilityRole="button" onPress={() => handleManageFundsPressed()}>
           <Text style={styles.manageFundsButtonText}>{loc.multisig.manage_keys}</Text>

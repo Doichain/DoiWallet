@@ -1,7 +1,7 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import { ActivityIndicator, BackHandler, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { Image, ActivityIndicator, BackHandler, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from '@rneui/themed';
 import * as BlueElectrum from '../../blue_modules/BlueElectrum';
 import triggerHapticFeedback, { HapticFeedbackTypes } from '../../blue_modules/hapticFeedback';
@@ -13,11 +13,13 @@ import HandOffComponent from '../../components/HandOffComponent';
 import TransactionIncomingIcon from '../../components/icons/TransactionIncomingIcon';
 import TransactionOutgoingIcon from '../../components/icons/TransactionOutgoingIcon';
 import TransactionPendingIcon from '../../components/icons/TransactionPendingIcon';
+import ToolTipMenu from '../../components/TooltipMenu';
+import Clipboard from '@react-native-clipboard/clipboard';
 
 import SafeArea from '../../components/SafeArea';
 import { useTheme } from '../../components/themes';
 import loc, { formatBalanceWithoutSuffix } from '../../loc';
-import { DoichainUnit} from '../../models/doichainUnits';
+import { DoichainUnit } from '../../models/doichainUnits';
 import { useStorage } from '../../hooks/context/useStorage';
 import { HandOffActivityType } from '../../components/types';
 import HeaderRightButton from '../../components/HeaderRightButton';
@@ -162,6 +164,10 @@ const TransactionStatus = () => {
     ),
     [navigateToTransactionDetails],
   );
+  const [isUrlAccessible, setIsUrlAccessible] = useState(false);
+  const [name, setName] = useState<string>('');
+  const [image, setImage] = useState<string>('');
+  const [description, setDescription] = useState<string>(''); 
 
   useEffect(() => {
     setOptions({
@@ -371,6 +377,116 @@ const TransactionStatus = () => {
     });
   };
 
+  const checkUrlAccessibility = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        setIsUrlAccessible(true);
+      } else {
+        setIsUrlAccessible(false);
+      }
+    } catch (error) {
+      console.error('Error checking URL:', error);
+      setIsUrlAccessible(false);
+    }
+  };
+
+  async function fetchJson(url: string) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error('FetchJson error:', response.status);
+
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('FetchJson error:', error);
+    }
+  }
+
+  const actions = [
+    {
+      id: 'copyToClipboard',
+      text: loc.transactions.details_copy,
+      icon: { iconValue: 'doc.on.doc' }, 
+    }
+  ];
+
+  const onPressMenuItem = (key: string) => {    
+    Clipboard.setString(key);        
+  };
+
+  const renderNameOps = () => { 
+    
+      if (tx.outputs) {
+        for (const output of tx.outputs) {
+          if (output?.scriptPubKey?.nameOp) {
+            const nameOpValue = output.scriptPubKey.nameOp.value;
+            //const nameOpValue = 'ipfs://bafkreiewupt5xwng6jjn3xpewq2q6tta32zohkvad3rqnhiatlklhv3gha';
+            //const nameOpValue = 'ipfs://bafkreidjj5xgyvlxcmuuaqphnsyiu4gnlyddfwmufazlea4xf6uckyr6qy';
+            const urlPattern = /(ipfs?:\/\/[^\s]+)/g;
+            const containsUrl = urlPattern.test(nameOpValue);
+            if (containsUrl) {
+              const ipfsGateway = 'https://ipfs.le-space.de/ipfs/';
+              const jsonUrl = nameOpValue.replace('ipfs://', ipfsGateway);
+              fetchJson(jsonUrl).then(data => {
+                if(data){
+                  const imageUrl = data.image.replace('ipfs://', ipfsGateway);
+                  checkUrlAccessibility(imageUrl);
+                  setDescription(data.description)
+                  setImage(imageUrl)
+                  setName(data.name)
+                }                
+              });
+            }
+            return (
+              <View style={styles.memo}>
+
+                {isUrlAccessible ? (
+                  <>  
+                    <Text selectable style={styles.title}>{name}</Text>
+                    <Text selectable style={styles.description}>{description}</Text>
+                    <Image  
+                      //source={{ uri: 'https://ipfs.le-space.de/ipfs/bafkreihvhtwrjc3kpl273q7nwk2peiuhr7zr4vugzam4x3guoht66udjf4' }}
+                      source={{ uri: image }}
+                      style={styles.image}
+                      resizeMode="contain"                      
+                    />   
+                    <BlueSpacing20 />
+
+                    {/* <ToolTipMenu key={'name'} isButton title={""} actions={actions} onPressMenuItem={onPressMenuItem}>
+                      <Text selectable style={styles.memoText}>
+                        {loc.transactions.nameOps_name}: {output.scriptPubKey.nameOp.name}
+                      </Text>
+                    </ToolTipMenu>             */}
+
+                    <Text selectable style={styles.memoText}>
+                      {loc.transactions.nameOps_name}: {output.scriptPubKey.nameOp.name}
+                    </Text>
+
+                    <Text selectable style={styles.memoText}>
+                      {loc.transactions.nameOps_value}: {output.scriptPubKey.nameOp.value}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                      <Text selectable style={styles.memoText}>
+                        {loc.transactions.nameOps_name}: {output.scriptPubKey.nameOp.name}
+                      </Text>                    
+                      <Text selectable style={styles.memoText}>
+                        {loc.transactions.nameOps_value}: {output.scriptPubKey.nameOp.value}
+                      </Text>
+                  </>
+                )}
+                <BlueSpacing20 />
+              </View>
+            );
+          }
+        }
+      }
+  };
+
   const renderCPFP = () => {
     if (isCPFPPossible === ButtonStatus.Unknown) {
       return (
@@ -487,8 +603,9 @@ const TransactionStatus = () => {
 
       <View style={styles.container}>
         <BlueCard>
+          {renderNameOps()}
           <View style={styles.center}>
-            <Text style={[styles.value, stylesHook.value]} selectable>
+            <Text style={isUrlAccessible ? [styles.valueSmall, stylesHook.value] : [styles.value, stylesHook.value]} selectable>
               {formatBalanceWithoutSuffix(tx.value, wallet.current.preferredBalanceUnit, true)}{' '}
 
               {wallet.current.preferredBalanceUnit !== DoichainUnit.LOCAL_CURRENCY && (
@@ -501,9 +618,9 @@ const TransactionStatus = () => {
           {renderTXMetadata()}
           {renderTXCounterparty()}
 
-          <View style={[styles.iconRoot, stylesHook.iconRoot]}>
+          <View style={isUrlAccessible ? [styles.iconRootSmall, stylesHook.iconRoot] :[styles.iconRoot, stylesHook.iconRoot]}>
             <View>
-              <Icon name="check" size={50} type="font-awesome" color={colors.successCheck} />
+              <Icon name="check" size={isUrlAccessible ? 25 : 50} type="font-awesome" color={colors.successCheck} />
             </View>
             <View style={[styles.iconWrap, styles.margin]}>
               {(() => {
@@ -540,7 +657,6 @@ const TransactionStatus = () => {
               </BlueText>
             </View>
           )}
-
           <View style={styles.confirmations}>
             <Text style={styles.confirmationsText}>
               {loc.formatString(loc.transactions.confirmations_lowercase, {
@@ -579,6 +695,10 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '600',
   },
+  valueSmall:{
+    fontSize: 26,
+    fontWeight: '600',
+  },
   valueUnit: {
     fontSize: 16,
     fontWeight: '600',
@@ -590,6 +710,8 @@ const styles = StyleSheet.create({
   memoText: {
     color: '#9aa0aa',
     fontSize: 14,
+    alignSelf: 'flex-start',
+    marginBottom: 5,
   },
   iconRoot: {
     width: 120,
@@ -599,6 +721,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 43,
     marginBottom: 53,
+  },
+  iconRootSmall: {
+    width: 60,
+    height: 60,
+    borderRadius: 60,
+    alignSelf: 'center',
+    justifyContent: 'center',
+    marginTop: 25,
+    marginBottom: 25,
   },
   iconWrap: {
     minWidth: 30,
@@ -652,4 +783,32 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
+  image: {
+    width: '100%', 
+    height: 300,
+    margin:10,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    elevation: 4, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 8,
+    overflow: 'hidden',
+
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#9aa0aa',
+    marginBottom: 5,
+  },
+  description:{
+    color: '#9aa0aa',
+    fontSize: 14,
+    alignSelf: 'center',
+    marginBottom: 10,
+  }
 });

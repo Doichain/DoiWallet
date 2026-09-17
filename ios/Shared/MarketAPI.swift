@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 var numberFormatter: NumberFormatter {
   let formatter = NumberFormatter()
@@ -27,12 +28,14 @@ class MarketAPI {
            return "https://api.exir.io/v1/ticker?symbol=btc-irt"
        case "coinpaprika":
            return "https://api.coinpaprika.com/v1/tickers/btc-bitcoin?quotes=INR"
+       case "Coinpaprika":
+           return  "https://api.coinpaprika.com/v1/tickers/doi-doicoin?quotes=\(endPointKey.uppercased())"
        case "Bitstamp":
            return "https://www.bitstamp.net/api/v2/ticker/btc\(endPointKey.lowercased())"
        case "Coinbase":
            return "https://api.coinbase.com/v2/prices/BTC-\(endPointKey.uppercased())/buy"
        case "CoinGecko":
-           return "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=\(endPointKey.lowercased())"
+           return "https://api.coingecko.com/api/v3/simple/price?ids=doichain&vs_currencies=\(endPointKey.lowercased())"
        case "BNR":
            return "https://www.bnr.ro/nbrfxrates.xml"
        case "Kraken":
@@ -46,8 +49,7 @@ class MarketAPI {
           guard let json = (try? JSONSerialization.jsonObject(with: data, options: [])) as? Dictionary<String, Any> else {
               completion(nil, CurrencyError(errorDescription: "JSON parsing error."))
               return
-          }
-
+          } 
           parseJSONBasedOnSource(json: json, source: source, endPointKey: endPointKey, completion: completion)
     }
   
@@ -61,7 +63,7 @@ class MarketAPI {
              let lastUpdated = rateDict["timestamp"] as? Int {
               let unix = Double(lastUpdated / 1_000)
               let lastUpdatedString = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: unix))
-              latestRateDataStore = WidgetDataStore(rate: String(rateDouble), lastUpdate: lastUpdatedString, rateDouble: rateDouble)
+            latestRateDataStore = WidgetDataStore(rate: String(rateDouble), lastUpdate: lastUpdatedString, rateDouble: rateDouble, volume:0.00,  percent:0.00)
               completion(latestRateDataStore, nil)
           } else {
               completion(nil, CurrencyError(errorDescription: "Data formatting error for source: \(source)"))
@@ -72,13 +74,13 @@ class MarketAPI {
                else { break }
                let unix = Double(lastUpdated / 1_000)
                let lastUpdatedString = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: unix))
-               latestRateDataStore = WidgetDataStore(rate: String(rateDouble), lastUpdate: lastUpdatedString, rateDouble: rateDouble)
+               latestRateDataStore = WidgetDataStore(rate: String(rateDouble), lastUpdate: lastUpdatedString, rateDouble: rateDouble,  volume:0.00,  percent:0.00)
         completion(latestRateDataStore, nil)
       case "CoinGecko":
           if let bitcoinDict = json["bitcoin"] as? [String: Any],
              let rateDouble = bitcoinDict[endPointKey.lowercased()] as? Double {
               let lastUpdatedString = ISO8601DateFormatter().string(from: Date())
-              latestRateDataStore = WidgetDataStore(rate: String(rateDouble), lastUpdate: lastUpdatedString, rateDouble: rateDouble)
+              latestRateDataStore = WidgetDataStore(rate: String(rateDouble), lastUpdate: lastUpdatedString, rateDouble: rateDouble,  volume:0.00,  percent:0.00)
               completion(latestRateDataStore, nil)
           } else {
               completion(nil, CurrencyError(errorDescription: "Data formatting error for source: \(source)"))
@@ -87,7 +89,7 @@ class MarketAPI {
       case "Exir":
           if let rateDouble = json["last"] as? Double {
               let lastUpdatedString = ISO8601DateFormatter().string(from: Date())
-              latestRateDataStore = WidgetDataStore(rate: String(rateDouble), lastUpdate: lastUpdatedString, rateDouble: rateDouble)
+              latestRateDataStore = WidgetDataStore(rate: String(rateDouble), lastUpdate: lastUpdatedString, rateDouble: rateDouble, volume:0.00,  percent:0.00)
               completion(latestRateDataStore, nil)
           } else {
               completion(nil, CurrencyError(errorDescription: "Data formatting error for source: \(source)"))
@@ -96,31 +98,32 @@ class MarketAPI {
       case "Bitstamp":
           if let rateString = json["last"] as? String, let rateDouble = Double(rateString) {
               let lastUpdatedString = ISO8601DateFormatter().string(from: Date())
-              latestRateDataStore = WidgetDataStore(rate: rateString, lastUpdate: lastUpdatedString, rateDouble: rateDouble)
+              latestRateDataStore = WidgetDataStore(rate: rateString, lastUpdate: lastUpdatedString, rateDouble: rateDouble, volume:0.00,  percent:0.00)
               completion(latestRateDataStore, nil)
           } else {
               completion(nil, CurrencyError(errorDescription: "Data formatting error for source: \(source)"))
           }
           
-     case "coinpaprika":
-    if let quotesDict = json["quotes"] as? [String: Any],
-       let inrDict = quotesDict["INR"] as? [String: Any],
-       let rateDouble = inrDict["price"] as? Double {
-        
-        let rateString = String(rateDouble)
-        let lastUpdatedString = ISO8601DateFormatter().string(from: Date())
-        
-        latestRateDataStore = WidgetDataStore(rate: rateString, lastUpdate: lastUpdatedString, rateDouble: rateDouble)
-        completion(latestRateDataStore, nil)
-    } else {
-        completion(nil, CurrencyError(errorDescription: "Data formatting error for source: \(source)"))
-    }
+     case "Coinpaprika":
+        if let quotesDict = json["quotes"] as? [String: Any],
+        let inrDict = quotesDict["\(endPointKey.uppercased())"] as? [String: Any],
+        let rateDouble = inrDict["price"] as? Double {          
+            let volume = (inrDict["volume_24h"] as? Double) ?? 0.0
+            let percent = (inrDict["percent_change_24h"] as? Double) ?? 0.0        
+            let rateString = String(rateDouble)            
+            let lastUpdatedString = ISO8601DateFormatter().string(from: Date())            
+            latestRateDataStore = WidgetDataStore(rate: rateString, lastUpdate: lastUpdatedString, rateDouble: rateDouble, volume:volume, percent:percent )
+            completion(latestRateDataStore, nil)
+        } else {
+            completion(nil, CurrencyError(errorDescription: "Data formatting error for source: \(source)"))
+        }
+              
       case "Coinbase":
           if let data = json["data"] as? [String: Any],
              let rateString = data["amount"] as? String,
              let rateDouble = Double(rateString) {
               let lastUpdatedString = ISO8601DateFormatter().string(from: Date())
-              latestRateDataStore = WidgetDataStore(rate: rateString, lastUpdate: lastUpdatedString, rateDouble: rateDouble)
+              latestRateDataStore = WidgetDataStore(rate: rateString, lastUpdate: lastUpdatedString, rateDouble: rateDouble,  volume:0.00,  percent:0.00)
               completion(latestRateDataStore, nil)
           } else {
               completion(nil, CurrencyError(errorDescription: "Data formatting error for source: \(source)"))
@@ -136,7 +139,7 @@ class MarketAPI {
               let rateString = c.first,
               let rateDouble = Double(rateString) {
                let lastUpdatedString = ISO8601DateFormatter().string(from: Date())
-               latestRateDataStore = WidgetDataStore(rate: rateString, lastUpdate: lastUpdatedString, rateDouble: rateDouble)
+               latestRateDataStore = WidgetDataStore(rate: rateString, lastUpdate: lastUpdatedString, rateDouble: rateDouble, volume:0.00,  percent:0.00)
                completion(latestRateDataStore, nil)
            } else {
                if let errorMessage = json["error"] as? [String] {
@@ -157,7 +160,7 @@ class MarketAPI {
       let delegate = BNRXMLParserDelegate()
       parser.delegate = delegate
       if parser.parse(), let usdToRonRate = delegate.usdRate {
-          let coinGeckoUrl = URL(string: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd")!
+          let coinGeckoUrl = URL(string: "https://api.coingecko.com/api/v3/simple/price?ids=doichain&vs_currencies=usd")!
           URLSession.shared.dataTask(with: coinGeckoUrl) { data, _, error in
               guard let data = data, error == nil else {
                   completion(nil, error ?? CurrencyError())
@@ -170,7 +173,7 @@ class MarketAPI {
                      let btcToUsdRate = bitcoinDict["usd"] {
                       let btcToRonRate = btcToUsdRate * usdToRonRate
                       let lastUpdatedString = ISO8601DateFormatter().string(from: Date())
-                      let latestRateDataStore = WidgetDataStore(rate: String(btcToRonRate), lastUpdate: lastUpdatedString, rateDouble: btcToRonRate)
+                    let latestRateDataStore = WidgetDataStore(rate: String(btcToRonRate), lastUpdate: lastUpdatedString, rateDouble: btcToRonRate, volume:0.00,  percent:0.00)
                       completion(latestRateDataStore, nil)
                   } else {
                       completion(nil, CurrencyError())

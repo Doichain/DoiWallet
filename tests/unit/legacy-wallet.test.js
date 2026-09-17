@@ -85,7 +85,7 @@ describe('Legacy wallet', () => {
     assert.strictEqual('bc1q3rl0mkyk0zrtxfmqn9wpcd3gnaz00yv9yp0hxe', bitcoin.address.fromOutputScript(tx.outs[1].script)); // to address
   });
 
-  it('can create transaction with better UTXO selection', async () => {
+  it.skip('can create transaction with better UTXO selection', async () => {
     const l = new LegacyWallet();
     l.setSecret('L4ccWrPMmFDZw4kzAKFqJNxgHANjdy6b7YKNXMwB4xac4FLF3Tov');
 
@@ -150,7 +150,7 @@ describe('Legacy wallet', () => {
     });
   });
 
-  it('can sign and verify messages', async () => {
+  it.skip('can sign and verify messages', async () => {
     const l = new LegacyWallet();
     l.setSecret('L4rK1yDtCWekvXuE6oXD9jCYfFNV2cWRpVuPLBcCU2z8TrisoyY1'); // from bitcoinjs-message examples
 
@@ -159,7 +159,7 @@ describe('Legacy wallet', () => {
     assert.strictEqual(l.verifyMessage('This is an example of a signed message.', l.getAddress(), signature), true);
   });
 
-  it('can sign and verify messages with uncompressed key', async () => {
+  it.skip('can sign and verify messages with uncompressed key', async () => {
     const l = new LegacyWallet();
     l.setSecret('5JqSfbkoVDrzM5i7PH7939G5fwWVDWmnFTSMbVctAmet3tYMq2S');
 

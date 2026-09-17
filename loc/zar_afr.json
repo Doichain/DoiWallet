@@ -44,7 +44,6 @@
     "network": "Netwerk Vout"
   },
   "lnd": {
-    "errorInvoiceExpired": "Faktuur het verval.",
     "expired": "Verval",
     "expiresIn": "Verval in {time} minute",
     "payButton": "Betaal",

@@ -47,10 +47,8 @@
     "error": "ختا",
     "network": "ختا شبکه"
   },
-  "lnd": {
-    "errorInvoiceExpired": "سۊرت هساو مونقزی وابیڌه.",
+  "lnd": {    
     "expired": "مونقزی وابیڌه",
-    "expiresIn": "تا {time} دیقه دی مونقزی ابۊ",
     "payButton": "پرداخت",
     "payment": "پرداخت",
     "placeholder": "سۊرت هساو یا آدرس",

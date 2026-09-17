@@ -51,9 +51,7 @@
     "network": "Błąd sieciowy"
   },
   "lnd": {
-    "errorInvoiceExpired": "Faktura wygasła.",
     "expired": "Przeterminowana",
-    "expiresIn": "Traci ważność w ciągu {time} minut",
     "payButton": "Zapłać",
     "payment": "Płatność",
     "placeholder": "Faktura lub adres",

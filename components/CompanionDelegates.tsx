@@ -9,7 +9,6 @@ import BlueClipboard from '../blue_modules/clipboard';
 import { updateExchangeRate } from '../blue_modules/currency';
 import triggerHapticFeedback, { HapticFeedbackTypes } from '../blue_modules/hapticFeedback';
 import Notifications from '../blue_modules/notifications';
-import { LightningCustodianWallet } from '../class';
 import DeeplinkSchemaMatch from '../class/deeplink-schema-match';
 import loc from '../loc';
 import { Chain } from '../models/doichainUnits';
@@ -156,7 +155,7 @@ const CompanionDelegates = () => {
           if (wallet.chain === Chain.ONCHAIN) {
             return wallet.isAddressValid && wallet.isAddressValid(clipboard) && wallet.weOwnAddress(clipboard);
           } else {
-            return (wallet as LightningCustodianWallet).isInvoiceGeneratedByWallet(clipboard) || wallet.weOwnAddress(clipboard);
+            return wallet.weOwnAddress(clipboard);
           }
         });
         const isBitcoinAddress = DeeplinkSchemaMatch.isBitcoinAddress(clipboard);

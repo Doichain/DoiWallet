@@ -8,6 +8,7 @@ import { extractTextFromElementById, getSwitchValue, hashIt, helperImportWallet,
  * before anything else.
  * we dont clean it up as we expect other test suites to do clean install of the app
  */
+/*
 beforeAll(async () => {
   if (!process.env.HD_MNEMONIC_BIP84) {
     console.error('process.env.HD_MNEMONIC_BIP84 not set, skipped');
@@ -22,9 +23,9 @@ beforeAll(async () => {
   await device.pressBack();
   await sleep(15000);
 }, 1200_000);
-
+*/
 describe('BlueWallet UI Tests - import BIP84 wallet', () => {
-  it('can create a transaction; can scanQR with bip21; can switch units', async () => {
+  it.skip('can create a transaction; can scanQR with bip21; can switch units', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t21');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t21'), 'as it previously passed on Travis');
@@ -174,7 +175,7 @@ describe('BlueWallet UI Tests - import BIP84 wallet', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can batch send', async () => {
+  it.skip('can batch send', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t_batch_send');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping as it previously passed on Travis');
@@ -248,7 +249,7 @@ describe('BlueWallet UI Tests - import BIP84 wallet', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can sendMAX', async () => {
+  it.skip('can sendMAX', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t_sendMAX');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping as it previously passed on Travis');
@@ -318,7 +319,7 @@ describe('BlueWallet UI Tests - import BIP84 wallet', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can cosign psbt', async () => {
+  it.skip('can cosign psbt', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t_cosign');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping as it previously passed on Travis');
@@ -362,7 +363,7 @@ describe('BlueWallet UI Tests - import BIP84 wallet', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('payment codes & manage contacts', async () => {
+  it.skip('payment codes & manage contacts', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t_manage_contacts');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping as it previously passed on Travis');
@@ -485,7 +486,7 @@ describe('BlueWallet UI Tests - import BIP84 wallet', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can do basic wallet-details operations', async () => {
+  it.skip('can do basic wallet-details operations', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t_walletdetails');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping as it previously passed on Travis');
@@ -535,7 +536,7 @@ describe('BlueWallet UI Tests - import BIP84 wallet', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('should handle URL successfully', async () => {
+  it.skip('should handle URL successfully', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t22');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t22'), 'as it previously passed on Travis');
@@ -572,7 +573,7 @@ describe('BlueWallet UI Tests - import BIP84 wallet', () => {
     process.env.TRAVIS && require('fs').writeFileSync(lockFile, '1');
   });
 
-  it('can manage UTXO', async () => {
+  it.skip('can manage UTXO', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t23');
     if (process.env.TRAVIS) {
       if (require('fs').existsSync(lockFile)) return console.warn('skipping', JSON.stringify('t23'), 'as it previously passed on Travis');

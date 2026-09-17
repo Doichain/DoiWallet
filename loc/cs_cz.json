@@ -52,9 +52,7 @@
     "network": "Chyba sítě"
   },
   "lnd": {
-    "errorInvoiceExpired": "Platnost faktury vypršela.",
     "expired": "Expirováno",
-    "expiresIn": "Vyprší za {time} minut",
     "payButton": "Zaplatit",
     "payment": "Platba",
     "placeholder": "Faktura nebo adresa",

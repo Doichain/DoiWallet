@@ -94,7 +94,7 @@ describe('import procedure', () => {
       ...store.callbacks,
     );
     await promise;
-    assert.strictEqual(store.state.wallets.length == 1, true);
+    assert.strictEqual(store.state.wallets.length === 1, true);
   });
 
   it('can import BIP84', async () => {
@@ -129,8 +129,8 @@ describe('import procedure', () => {
     await promise;
     assert.strictEqual(store.state.wallets[0].type, SegwitBech32Wallet.type);
     assert.strictEqual(store.state.wallets[0].getAddress(), 'dc1qydvmn0gvk9xwdq8pzd3gxm3vtftte948y66fzj');
-    //assert.strictEqual(store.state.wallets[1].type, LegacyWallet.type);
-    //assert.strictEqual(store.state.wallets[1].getAddress(), '1PV5YV6UWWL6rJuKsNH5uY75E9377hFFWn');
+    // assert.strictEqual(store.state.wallets[1].type, LegacyWallet.type);
+    // assert.strictEqual(store.state.wallets[1].getAddress(), '1PV5YV6UWWL6rJuKsNH5uY75E9377hFFWn');
   });
 
   it('can import Legacy/P2SH/Bech32 from an empty wallet', async () => {

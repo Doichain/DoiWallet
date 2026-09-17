@@ -48,7 +48,7 @@ class MainApplication : Application(), ReactApplication {
             load()
         }
 
-        val sharedPref = applicationContext.getSharedPreferences("group.io.bluewallet.bluewallet", Context.MODE_PRIVATE)
+        val sharedPref = applicationContext.getSharedPreferences("group.org.doichain.doiwallet", Context.MODE_PRIVATE)
 
         // Retrieve the "donottrack" value. Default to "0" if not found.
         val isDoNotTrackEnabled = sharedPref.getString("donottrack", "0")
