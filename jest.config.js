@@ -6,9 +6,9 @@ module.exports = {
     '^.+\\.(ts|tsx)$': 'ts-jest',
   },
   moduleFileExtensions: ['js', 'json', 'ts', 'tsx'],
-  // @react-navigation and @scure/base ship ES modules, so they have to be transformed too
+  // @react-navigation, @scure/base and @noble/secp256k1 3 ship ES modules, so they have to be transformed too
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native(-.*)?|@react-native(-community)?)|@react-navigation|@scure|silent-payments/)',
+    'node_modules/(?!((jest-)?react-native(-.*)?|@react-native(-community)?)|@react-navigation|@scure|@noble|silent-payments/)',
   ],
   moduleNameMapper: {
     '^@react-native-vector-icons/(.*)$': '<rootDir>/tests/mocks/vector-icons.js',

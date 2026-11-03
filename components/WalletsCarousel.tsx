@@ -28,6 +28,7 @@ import WalletGradient from '../class/wallet-gradient';
 import { useSizeClass, SizeClass } from '../blue_modules/sizeClass';
 import loc, { formatBalance, transactionTimeToReadable } from '../loc';
 import { BlurredBalanceView } from './BlurredBalanceView';
+import { withAlpha } from './color';
 import { useTheme } from './themes';
 import { Transaction, TWallet } from '../class/wallets/types';
 import { BlueSpacing10 } from './BlueSpacing';
@@ -35,7 +36,34 @@ import { useLocale } from '@react-navigation/native';
 
 export const WALLET_CAROUSEL_HEADER_WIDTH = 16;
 
+/** Base card body height at default Dynamic Type — grows with larger Dynamic Type, never shrinks below default. */
+export const WALLET_CARD_BASE_MIN_HEIGHT = 164;
+/** Top inset above wallet cards in the horizontal home carousel. */
+export const WALLET_CAROUSEL_PADDING_TOP = 12;
+/** Bottom inset so iOS card shadows (offset 4 + radius 8) are not clipped by the list row. */
+export const WALLET_CAROUSEL_PADDING_BOTTOM = 20;
+
+/** Scale layout metrics up for accessibility sizes; keep the design default when fontScale ≤ 1. */
+const scaleLayoutUp = (base: number, fontScale: number): number => Math.round(base * Math.max(1, fontScale));
+
+export const getWalletCardMinHeight = (fontScale = 1): number => scaleLayoutUp(WALLET_CARD_BASE_MIN_HEIGHT, fontScale);
+
+export const getWalletCarouselHeight = (fontScale = 1): number =>
+  scaleLayoutUp(WALLET_CAROUSEL_PADDING_TOP, fontScale) +
+  getWalletCardMinHeight(fontScale) +
+  scaleLayoutUp(WALLET_CAROUSEL_PADDING_BOTTOM, fontScale);
+
+/** Default carousel row height at `fontScale` 1 — prefer `getWalletCarouselHeight(fontScale)` when layout depends on Dynamic Type. */
+export const WALLET_CAROUSEL_HEIGHT = getWalletCarouselHeight(1);
+
+/** Vertical gap between the wallet title/balance block and the latest-tx footer on carousel cards. */
+const WALLET_CARD_SECTION_GAP = 12;
+const WALLET_CARD_TEXT_OPACITY = 0.85;
+
 export const getWalletCarouselItemWidth = (screenWidth: number) => Math.round(screenWidth * 0.82 > 375 ? 375 : screenWidth * 0.82);
+
+export const walletHasPendingTransaction = (item: TWallet): boolean =>
+  item.getTransactions().some((tx: Transaction) => tx.confirmations === 0);
 
 interface NewWalletPanelProps {
   onPress: () => void;
@@ -158,23 +186,28 @@ const iStyles = StyleSheet.create({
     borderRadius: 12,
     minHeight: 164,
     overflow: 'hidden',
+    justifyContent: 'flex-end',
   },
   gradCompact: {
     borderRadius: 10,
     minHeight: 132,
     overflow: 'hidden',
+    justifyContent: 'flex-end',
   },
   gradContent: {
     padding: 15,
+    width: '100%',
   },
   gradContentCompact: {
     padding: 12,
   },
   balanceContainer: {
-    height: 40,
+    minHeight: 40,
+    justifyContent: 'center',
   },
   balanceContainerCompact: {
-    height: 32,
+    minHeight: 32,
+    justifyContent: 'center',
   },
   image: {
     width: 99,
@@ -186,9 +219,6 @@ const iStyles = StyleSheet.create({
   imageCompact: {
     width: 78,
     height: 74,
-  },
-  br: {
-    backgroundColor: 'transparent',
   },
   label: {
     backgroundColor: 'transparent',
@@ -204,7 +234,6 @@ const iStyles = StyleSheet.create({
   },
   balanceCompact: {
     fontSize: 28,
-    lineHeight: 34,
   },
   latestTx: {
     backgroundColor: 'transparent',
@@ -251,239 +280,249 @@ const iStyles = StyleSheet.create({
   },
 });
 
-export const WalletCarouselItem: React.FC<WalletCarouselItemProps> = React.memo(
-  ({
-    item,
-    hideBalance,
-    onPress,
-    handleLongPress,
-    isSelectedWallet,
-    customStyle,
-    horizontal,
-    searchQuery,
-    renderHighlightedText,
-    animationsEnabled = true,
-    isPlaceHolder = false,
-    onPressIn,
-    onPressOut,
-    isNewWallet = false,
-    isExiting = false,
-    isDraggingActive = false,
-    dragActiveScale = 1.02,
-    sizeVariant = 'default',
-  }: WalletCarouselItemProps) => {
-    const walletLabel = item.getLabel ? item.getLabel() : '';
-    const pressScale = useSharedValue(1.0);
-    const dragScale = useSharedValue(isDraggingActive ? dragActiveScale : 1.0);
-    const opacityValue = useSharedValue(isSelectedWallet === false ? 0.5 : 1.0);
-    const translateYValue = useSharedValue(isNewWallet ? 20 : 0);
-    const balanceOpacity = useSharedValue(1);
-    const balanceTranslateY = useSharedValue(0);
-    const { colors } = useTheme();
-    const { width } = useWindowDimensions();
-    const itemWidth = getWalletCarouselItemWidth(width);
-    const { sizeClass } = useSizeClass();
-    const isCompact = sizeVariant === 'compact';
-    const { direction } = useLocale();
-    const previousBalance = useRef<string | undefined>(undefined);
-    const balance = !hideBalance && formatBalance(Number(item.getBalance()), item.getPreferredBalanceUnit(), true);
-    const safeBalance = balance || undefined;
+export const WalletCarouselItem: React.FC<WalletCarouselItemProps> = ({
+  item,
+  hideBalance,
+  onPress,
+  handleLongPress,
+  isSelectedWallet,
+  customStyle,
+  horizontal,
+  searchQuery,
+  renderHighlightedText,
+  animationsEnabled = true,
+  isPlaceHolder = false,
+  onPressIn,
+  onPressOut,
+  isNewWallet = false,
+  isExiting = false,
+  isDraggingActive = false,
+  dragActiveScale = 1.02,
+  sizeVariant = 'default',
+}: WalletCarouselItemProps) => {
+  const walletLabel = item.getLabel ? item.getLabel() : '';
+  const pressScale = useSharedValue(1.0);
+  const dragScale = useSharedValue(isDraggingActive ? dragActiveScale : 1.0);
+  const opacityValue = useSharedValue(isSelectedWallet === false ? 0.5 : 1.0);
+  const translateYValue = useSharedValue(isNewWallet ? 20 : 0);
+  const balanceOpacity = useSharedValue(1);
+  const balanceTranslateY = useSharedValue(0);
+  const { colors } = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const itemWidth = getWalletCarouselItemWidth(width);
+  const { sizeClass } = useSizeClass();
+  const isCompact = sizeVariant === 'compact';
+  const { direction } = useLocale();
+  const scaledCardStyles = useMemo(
+    () => ({
+      grad: { minHeight: getWalletCardMinHeight(fontScale) },
+      gradContent: { padding: scaleLayoutUp(15, fontScale) },
+      balanceContainer: { minHeight: scaleLayoutUp(40, fontScale) },
+      textSpacer: { height: scaleLayoutUp(WALLET_CARD_SECTION_GAP, fontScale) },
+      label: { lineHeight: scaleLayoutUp(24, fontScale) },
+      balance: { lineHeight: scaleLayoutUp(38, fontScale) },
+      balanceCompact: { lineHeight: scaleLayoutUp(30, fontScale) },
+      latestTx: { lineHeight: scaleLayoutUp(18, fontScale) },
+      latestTxTime: { lineHeight: scaleLayoutUp(22, fontScale) },
+    }),
+    [fontScale],
+  );
+  const cardTextStyle = useMemo(
+    () => ({
+      color: withAlpha(colors.inverseForegroundColor, WALLET_CARD_TEXT_OPACITY),
+      writingDirection: direction,
+    }),
+    [colors.inverseForegroundColor, direction],
+  );
+  const previousBalance = useRef<string | undefined>(undefined);
+  const balance = !hideBalance && formatBalance(Number(item.getBalance()), item.getPreferredBalanceUnit(), true);
+  const safeBalance = balance || undefined;
 
-    const animatePressScale = useCallback(
-      (toValue: number) => {
-        pressScale.value = withSpring(toValue, { damping: 13, stiffness: 180, mass: 0.9 });
-      },
-      [pressScale],
-    );
+  const animatePressScale = useCallback(
+    (toValue: number) => {
+      pressScale.value = withSpring(toValue, { damping: 13, stiffness: 180, mass: 0.9 });
+    },
+    [pressScale],
+  );
 
-    useEffect(() => {
-      dragScale.value = withSpring(isDraggingActive ? dragActiveScale : 1, { damping: 16, stiffness: 200, mass: 1 });
-    }, [isDraggingActive, dragActiveScale, dragScale]);
+  useEffect(() => {
+    dragScale.value = withSpring(isDraggingActive ? dragActiveScale : 1, { damping: 16, stiffness: 200, mass: 1 });
+  }, [isDraggingActive, dragActiveScale, dragScale]);
 
-    useEffect(() => {
-      if (!animationsEnabled) return;
+  useEffect(() => {
+    if (!animationsEnabled) return;
 
-      const targetOpacity = isSelectedWallet === false ? 0.5 : 1.0;
-      opacityValue.value = withSpring(targetOpacity, { damping: 18, stiffness: 240 });
-    }, [isSelectedWallet, opacityValue, animationsEnabled]);
+    const targetOpacity = isSelectedWallet === false ? 0.5 : 1.0;
+    opacityValue.value = withSpring(targetOpacity, { damping: 18, stiffness: 240 });
+  }, [isSelectedWallet, opacityValue, animationsEnabled]);
 
-    const onPressedIn = useCallback(() => {
-      if (animationsEnabled) {
-        animatePressScale(0.97);
-      }
-      if (onPressIn) onPressIn();
-    }, [animatePressScale, animationsEnabled, onPressIn]);
+  const onPressedIn = useCallback(() => {
+    if (animationsEnabled) {
+      animatePressScale(0.97);
+    }
+    if (onPressIn) onPressIn();
+  }, [animatePressScale, animationsEnabled, onPressIn]);
 
-    const onPressedOut = useCallback(() => {
-      if (animationsEnabled) {
-        animatePressScale(1.0);
-      }
-      if (onPressOut) onPressOut();
-    }, [animatePressScale, animationsEnabled, onPressOut]);
+  const onPressedOut = useCallback(() => {
+    if (animationsEnabled) {
+      animatePressScale(1.0);
+    }
+    if (onPressOut) onPressOut();
+  }, [animatePressScale, animationsEnabled, onPressOut]);
 
-    const handlePress = useCallback(() => {
-      onPress(item);
-    }, [item, onPress]);
+  const handlePress = useCallback(() => {
+    onPress(item);
+  }, [item, onPress]);
 
-    useEffect(() => {
-      if (isNewWallet && animationsEnabled) {
-        translateYValue.value = withTiming(0, { duration: 300 });
-        opacityValue.value = withSpring(isSelectedWallet === false ? 0.5 : 1.0, { damping: 18, stiffness: 240 });
-      }
-    }, [isNewWallet, animationsEnabled, translateYValue, opacityValue, isSelectedWallet]);
+  useEffect(() => {
+    if (isNewWallet && animationsEnabled) {
+      translateYValue.value = withTiming(0, { duration: 300 });
+      opacityValue.value = withSpring(isSelectedWallet === false ? 0.5 : 1.0, { damping: 18, stiffness: 240 });
+    }
+  }, [isNewWallet, animationsEnabled, translateYValue, opacityValue, isSelectedWallet]);
 
-    useEffect(() => {
-      if (!animationsEnabled) {
-        previousBalance.current = safeBalance;
-        return;
-      }
-
-      if (previousBalance.current !== undefined && previousBalance.current !== safeBalance) {
-        // Subtle currency-like transition on balance updates.
-        balanceOpacity.value = 0;
-        balanceTranslateY.value = 6;
-        balanceOpacity.value = withTiming(1, { duration: 180 });
-        balanceTranslateY.value = withSpring(0, { damping: 16, stiffness: 220 });
-      }
-
+  useEffect(() => {
+    if (!animationsEnabled) {
       previousBalance.current = safeBalance;
-    }, [safeBalance, animationsEnabled, balanceOpacity, balanceTranslateY]);
-
-    useEffect(() => {
-      if (isExiting && animationsEnabled) {
-        translateYValue.value = withTiming(-20, { duration: 200 });
-        opacityValue.value = withTiming(0, { duration: 200 });
-      }
-    }, [isExiting, animationsEnabled, translateYValue, opacityValue]);
-
-    const animatedCardStyle = useAnimatedStyle(() => ({
-      opacity: opacityValue.value,
-      transform: [{ scale: pressScale.value * dragScale.value }, { translateY: translateYValue.value }],
-    }));
-
-    const animatedBalanceStyle = useAnimatedStyle(() => ({
-      opacity: balanceOpacity.value,
-      transform: [{ translateY: balanceTranslateY.value }],
-    }));
-
-    let image;
-    switch (item.type) {
-      case MultisigHDWallet.type:
-        image = direction === 'rtl' ? require('../img/vault-shape-rtl.png') : require('../img/vault-shape.png');
-        break;
-      default:
-        image = direction === 'rtl' ? require('../img/btc-shape-rtl.png') : require('../img/btc-shape.png');
+      return;
     }
 
-    let latestTransactionText;
-
-    const hasPendingTx = item.getTransactions().some((tx: Transaction) => tx.confirmations === 0);
-
-    if (item.getBalance() !== 0 && item.getLatestTransactionTime() === 0) {
-      latestTransactionText = loc.wallets.pull_to_refresh;
-    } else if (hasPendingTx) {
-      latestTransactionText = loc.transactions.pending;
-    } else {
-      latestTransactionText = transactionTimeToReadable(item.getLatestTransactionTime());
+    if (previousBalance.current !== undefined && previousBalance.current !== safeBalance) {
+      // Subtle currency-like transition on balance updates.
+      balanceOpacity.value = 0;
+      balanceTranslateY.value = 6;
+      balanceOpacity.value = withTiming(1, { duration: 180 });
+      balanceTranslateY.value = withSpring(0, { damping: 16, stiffness: 220 });
     }
 
-    return (
-      <Animated.View
-        style={[
-          sizeClass === SizeClass.Large || !horizontal
-            ? [iStyles.rootLargeDevice, customStyle]
-            : [iStyles.root, { width: itemWidth }, customStyle],
-          animatedCardStyle,
-        ]}
+    previousBalance.current = safeBalance;
+  }, [safeBalance, animationsEnabled, balanceOpacity, balanceTranslateY]);
+
+  useEffect(() => {
+    if (isExiting && animationsEnabled) {
+      translateYValue.value = withTiming(-20, { duration: 200 });
+      opacityValue.value = withTiming(0, { duration: 200 });
+    }
+  }, [isExiting, animationsEnabled, translateYValue, opacityValue]);
+
+  const animatedCardStyle = useAnimatedStyle(() => ({
+    opacity: opacityValue.value,
+    transform: [{ scale: pressScale.value * dragScale.value }, { translateY: translateYValue.value }],
+  }));
+
+  const animatedBalanceStyle = useAnimatedStyle(() => ({
+    opacity: balanceOpacity.value,
+    transform: [{ translateY: balanceTranslateY.value }],
+  }));
+
+  let image;
+  switch (item.type) {
+    case MultisigHDWallet.type:
+      image = direction === 'rtl' ? require('../img/vault-shape-rtl.png') : require('../img/vault-shape.png');
+      break;
+    default:
+      image = direction === 'rtl' ? require('../img/btc-shape-rtl.png') : require('../img/btc-shape.png');
+  }
+
+  let latestTransactionText;
+
+  if (item.getBalance() !== 0 && item.getLatestTransactionTime() === 0) {
+    latestTransactionText = loc.wallets.pull_to_refresh;
+  } else if (walletHasPendingTransaction(item)) {
+    latestTransactionText = loc.transactions.pending;
+  } else {
+    latestTransactionText = transactionTimeToReadable(item.getLatestTransactionTime());
+  }
+
+  return (
+    <Animated.View
+      style={[
+        sizeClass === SizeClass.Large || !horizontal
+          ? [iStyles.rootLargeDevice, customStyle]
+          : [iStyles.root, { width: itemWidth }, customStyle],
+        animatedCardStyle,
+      ]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        testID={walletLabel}
+        onPressIn={onPressedIn}
+        onPressOut={onPressedOut}
+        onLongPress={() => {
+          if (handleLongPress) handleLongPress();
+        }}
+        onPress={handlePress}
+        delayHoverIn={0}
+        delayHoverOut={0}
       >
-        <Pressable
-          accessibilityRole="button"
-          testID={walletLabel}
-          onPressIn={onPressedIn}
-          onPressOut={onPressedOut}
-          onLongPress={() => {
-            if (handleLongPress) handleLongPress();
-          }}
-          onPress={handlePress}
-          delayHoverIn={0}
-          delayHoverOut={0}
+        <View
+          style={[
+            iStyles.shadowContainer,
+            isCompact && iStyles.shadowContainerCompact,
+            { backgroundColor: colors.background, shadowColor: colors.shadowColor },
+          ]}
         >
-          <View
-            style={[
-              iStyles.shadowContainer,
-              isCompact && iStyles.shadowContainerCompact,
-              { backgroundColor: colors.background, shadowColor: colors.shadowColor },
-            ]}
+          <LinearGradient
+            colors={WalletGradient.gradientsFor(item.type)}
+            style={[iStyles.grad, isCompact && iStyles.gradCompact, scaledCardStyles.grad]}
           >
-            <LinearGradient colors={WalletGradient.gradientsFor(item.type)} style={[iStyles.grad, isCompact && iStyles.gradCompact]}>
-              <ImageBackground source={image} style={[iStyles.image, isCompact && iStyles.imageCompact]} />
-              <View style={[iStyles.gradContent, isCompact && iStyles.gradContentCompact]}>
-                <Text style={iStyles.br} />
-                {!isPlaceHolder && (
-                  <>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        iStyles.label,
-                        isCompact && iStyles.labelCompact,
-                        { color: colors.inverseForegroundColor, writingDirection: direction },
-                      ]}
-                    >
-                      {renderHighlightedText ? renderHighlightedText(walletLabel, searchQuery || '') : walletLabel}
-                    </Text>
-                    <View style={[iStyles.balanceContainer, isCompact && iStyles.balanceContainerCompact]}>
-                      {hideBalance ? (
-                        <>
-                          <BlueSpacing10 />
-                          <BlurredBalanceView />
-                        </>
-                      ) : (
-                        <Animated.Text
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          key={`${balance}`} // force component recreation on balance change. To fix right-to-left languages, like Farsi
-                          style={[
-                            iStyles.balance,
-                            isCompact && iStyles.balanceCompact,
-                            { color: colors.inverseForegroundColor, writingDirection: direction },
-                            animatedBalanceStyle,
-                          ]}
-                        >
-                          {`${balance} `}
-                        </Animated.Text>
-                      )}
-                    </View>
-                    <Text style={iStyles.br} />
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        iStyles.latestTx,
-                        isCompact && iStyles.latestTxCompact,
-                        { color: colors.inverseForegroundColor, writingDirection: direction },
-                      ]}
-                    >
-                      {loc.wallets.list_latest_transaction}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        iStyles.latestTxTime,
-                        isCompact && iStyles.latestTxTimeCompact,
-                        { color: colors.inverseForegroundColor, writingDirection: direction },
-                      ]}
-                    >
-                      {latestTransactionText}
-                    </Text>
-                  </>
-                )}
-              </View>
-            </LinearGradient>
-          </View>
-        </Pressable>
-      </Animated.View>
-    );
-  },
-);
+            <ImageBackground source={image} style={[iStyles.image, isCompact && iStyles.imageCompact]} />
+            <View style={[iStyles.gradContent, isCompact && iStyles.gradContentCompact, !isCompact && scaledCardStyles.gradContent]}>
+              {!isPlaceHolder && (
+                <>
+                  <Text numberOfLines={1} style={[iStyles.label, isCompact && iStyles.labelCompact, scaledCardStyles.label, cardTextStyle]}>
+                    {renderHighlightedText ? renderHighlightedText(walletLabel, searchQuery || '') : walletLabel}
+                  </Text>
+                  <View style={[iStyles.balanceContainer, isCompact && iStyles.balanceContainerCompact, scaledCardStyles.balanceContainer]}>
+                    {hideBalance ? (
+                      <>
+                        <BlueSpacing10 />
+                        <BlurredBalanceView />
+                      </>
+                    ) : (
+                      <Animated.Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.55}
+                        key={`${balance}`} // force component recreation on balance change. To fix right-to-left languages, like Farsi
+                        style={[
+                          iStyles.balance,
+                          isCompact && iStyles.balanceCompact,
+                          isCompact ? scaledCardStyles.balanceCompact : scaledCardStyles.balance,
+                          cardTextStyle,
+                          animatedBalanceStyle,
+                        ]}
+                      >
+                        {`${balance} `}
+                      </Animated.Text>
+                    )}
+                  </View>
+                  <View style={scaledCardStyles.textSpacer} />
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    style={[iStyles.latestTx, isCompact && iStyles.latestTxCompact, scaledCardStyles.latestTx, cardTextStyle]}
+                  >
+                    {loc.wallets.list_latest_transaction}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    style={[iStyles.latestTxTime, isCompact && iStyles.latestTxTimeCompact, scaledCardStyles.latestTxTime, cardTextStyle]}
+                  >
+                    {latestTransactionText}
+                  </Text>
+                </>
+              )}
+            </View>
+          </LinearGradient>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+};
 
 interface WalletsCarouselProps extends Partial<FlatListProps<any>> {
   horizontal?: boolean;
@@ -499,15 +538,7 @@ interface WalletsCarouselProps extends Partial<FlatListProps<any>> {
   animateChanges?: boolean;
 }
 
-type FlatListRefType = FlatList<any> & {
-  scrollToEnd(params?: { animated?: boolean | null }): void;
-  scrollToIndex(params: { animated?: boolean | null; index: number; viewOffset?: number; viewPosition?: number }): void;
-  scrollToItem(params: { animated?: boolean | null; item: TWallet; viewPosition?: number }): void;
-  scrollToOffset(params: { animated?: boolean | null; offset: number }): void;
-  recordInteraction(): void;
-  flashScrollIndicators(): void;
-  getNativeScrollRef(): View;
-};
+export type CarouselListRefType = FlatList<TWallet>;
 
 const styles = StyleSheet.create({
   listHeaderSeparator: {
@@ -518,7 +549,7 @@ const styles = StyleSheet.create({
 
 const ListHeaderSeparator = () => <View style={styles.listHeaderSeparator} />;
 
-const WalletsCarousel = forwardRef<FlatListRefType, WalletsCarouselProps>((props, ref) => {
+const WalletsCarousel = forwardRef<CarouselListRefType, WalletsCarouselProps>((props, ref) => {
   const {
     horizontal = true,
     data,
@@ -533,7 +564,7 @@ const WalletsCarousel = forwardRef<FlatListRefType, WalletsCarouselProps>((props
     animateChanges = false,
   } = props;
 
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const itemWidth = React.useMemo(() => getWalletCarouselItemWidth(width), [width]);
   const snapInterval = React.useMemo(() => itemWidth, [itemWidth]);
   const snapOffsets = React.useMemo(() => {
@@ -553,7 +584,7 @@ const WalletsCarousel = forwardRef<FlatListRefType, WalletsCarouselProps>((props
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
 
-  const flatListRef = useRef<FlatList<any>>(null);
+  const flatListRef = useRef<FlatList<TWallet>>(null);
   const walletRefs = useRef<Record<string, React.MutableRefObject<View | null>>>({});
 
   const { sizeClass } = useSizeClass();
@@ -642,7 +673,7 @@ const WalletsCarousel = forwardRef<FlatListRefType, WalletsCarouselProps>((props
             console.warn('[WalletsCarousel] Error scrolling to wallet:', error);
             // Fallback: try scrolling to offset
             // Use different measurement based on orientation
-            const itemSize = horizontal ? itemWidth : 195; // 195 is the approximate height of wallet card
+            const itemSize = horizontal ? itemWidth : WALLET_CAROUSEL_HEIGHT;
             flatListRef.current.scrollToOffset({
               offset: itemSize * walletIndex,
               animated,
@@ -764,7 +795,7 @@ const WalletsCarousel = forwardRef<FlatListRefType, WalletsCarouselProps>((props
 
   const keyExtractor = useCallback((item: TWallet, index: number) => (item?.getID ? item.getID() : index.toString()), []);
 
-  const sliderHeight = 195;
+  const sliderHeight = getWalletCarouselHeight(fontScale);
 
   useEffect(() => {
     return () => {
@@ -847,7 +878,8 @@ const WalletsCarousel = forwardRef<FlatListRefType, WalletsCarouselProps>((props
 
   const cStyles = StyleSheet.create({
     content: {
-      paddingTop: 16,
+      paddingTop: scaleLayoutUp(WALLET_CAROUSEL_PADDING_TOP, fontScale),
+      paddingBottom: scaleLayoutUp(WALLET_CAROUSEL_PADDING_BOTTOM, fontScale),
     },
     contentLargeScreen: {
       paddingHorizontal: sizeClass === SizeClass.Large ? 16 : 12,
@@ -858,7 +890,6 @@ const WalletsCarousel = forwardRef<FlatListRefType, WalletsCarouselProps>((props
     <FlatList
       ref={flatListRef}
       renderItem={renderItem}
-      extraData={[data, animateChanges, newWalletsMap.current, selectedWallet, lastAddedWalletId.current]}
       keyExtractor={keyExtractor}
       showsVerticalScrollIndicator={false}
       pagingEnabled={false}
@@ -876,12 +907,14 @@ const WalletsCarousel = forwardRef<FlatListRefType, WalletsCarouselProps>((props
       ListHeaderComponent={ListHeaderSeparator}
       contentInsetAdjustmentBehavior="automatic"
       automaticallyAdjustContentInsets
-      automaticallyAdjustKeyboardInsets
       automaticallyAdjustsScrollIndicatorInsets
-      style={{ minHeight: sliderHeight + 12 }}
+      scrollToOverflowEnabled
+      style={{ minHeight: sliderHeight }}
       onScrollToIndexFailed={onScrollToIndexFailed}
       ListFooterComponent={onNewWalletPress ? <NewWalletPanel onPress={onNewWalletPress} /> : null}
       {...props}
+      // After `{...props}` so a caller `extraData` cannot drop `data` from the list's update signal.
+      extraData={[props.extraData, data, animateChanges, newWalletsMap.current, selectedWallet, lastAddedWalletId.current]}
     />
   ) : (
     <View style={cStyles.contentLargeScreen}>

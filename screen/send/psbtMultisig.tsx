@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { useNavigation, RouteProp, useRoute } from '@react-navigation/native';
 import BigNumber from 'bignumber.js';
 import * as bitcoin from '@doichain/doichainjs-lib';
 import {
@@ -27,7 +27,6 @@ import { useTheme } from '../../components/themes';
 import loc from '../../loc';
 
 import { useStorage } from '../../hooks/context/useStorage';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import { combinePSBTs } from '../../util/combinePSBTs.ts';
 import { MultisigHDWallet } from '../../class/wallets/multisig-hd-wallet';
 import assert from 'assert';
@@ -45,7 +44,7 @@ type RouteParams = {
 
 const PsbtMultisig = () => {
   const { wallets } = useStorage();
-  const { navigate, setParams } = useExtendedNavigation();
+  const { navigate, setParams } = useNavigation();
   const { colors } = useTheme();
   const [flatListHeight, setFlatListHeight] = useState(0);
   const { walletID, psbtBase64, memo, receivedPSBTBase64, txhex, launchedBy } = useRoute<RouteProp<RouteParams>>().params;

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useReducer, useMemo } from 'react';
-import { useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
 import { WatchOnlyWallet } from '../../class/wallets/watch-only-wallet';
 import { AddressItem } from '../../components/addresses/AddressItem';
@@ -7,7 +7,6 @@ import { useTheme } from '../../components/themes';
 import { useStorage } from '../../hooks/context/useStorage';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { DetailViewStackParamList } from '../../navigation/DetailViewStackParamList';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import SegmentedControl from '../../components/SegmentedControl';
 import loc from '../../loc';
 
@@ -130,7 +129,7 @@ const WalletAddresses: React.FC = () => {
   const { colors } = useTheme();
   const { isPrivacyBlurEnabled } = useSettings();
   const { enableScreenProtect, disableScreenProtect } = useScreenProtect();
-  const { setOptions } = useExtendedNavigation<NavigationProps>();
+  const { setOptions } = useNavigation<NavigationProps>();
 
   const stylesHook = StyleSheet.create({
     root: {
@@ -243,9 +242,11 @@ const WalletAddresses: React.FC = () => {
       automaticallyAdjustContentInsets
       automaticallyAdjustsScrollIndicatorInsets
       automaticallyAdjustKeyboardInsets
+      scrollToOverflowEnabled
       ListHeaderComponent={
         <View style={styles.segmentedHeader}>
           <SegmentedControl
+            usePlatformStyle
             values={Object.values(TABS).map(tab => loc.addresses[`type_${tab}`])}
             selectedIndex={Object.values(TABS).findIndex(tab => tab === currentTab)}
             onChange={index => {

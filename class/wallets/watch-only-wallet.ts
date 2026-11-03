@@ -9,6 +9,8 @@ import { HDSegwitP2SHWallet } from './hd-segwit-p2sh-wallet';
 import { LegacyWallet } from './legacy-wallet';
 import { THDWalletForWatchOnly } from './types';
 import { DOICHAIN } from '../../blue_modules/network.js';
+import { HDTaprootWallet } from './hd-taproot-wallet';
+import { WalletDescriptor } from '../wallet-descriptor.ts';
 
 const bip32 = BIP32Factory(ecc);
 
@@ -45,6 +47,10 @@ export class WatchOnlyWallet extends LegacyWallet {
 
   allowSend() {
     return this.useWithHardwareWalletEnabled() && this.isHd() && this._hdWalletInstance!.allowSend();
+  }
+
+  allowRBF() {
+    return this._hdWalletInstance?.allowRBF() ?? false;
   }
 
   allowSignVerifyMessage() {
@@ -140,29 +146,27 @@ export class WatchOnlyWallet extends LegacyWallet {
   }
 
   async fetchBalance() {
-    if (this.secret.startsWith('xpub') || this.secret.startsWith('ypub') || this.secret.startsWith('zpub')) {
+    if (this.isHd()) {
       if (!this._hdWalletInstance) this.init();
       if (!this._hdWalletInstance) throw new Error('Internal error: _hdWalletInstance is not initialized');
       return this._hdWalletInstance.fetchBalance();
     } else {
-      // return LegacyWallet.prototype.fetchBalance.call(this);
       return super.fetchBalance();
     }
   }
 
   async fetchTransactions() {
-    if (this.secret.startsWith('xpub') || this.secret.startsWith('ypub') || this.secret.startsWith('zpub')) {
+    if (this.isHd()) {
       if (!this._hdWalletInstance) this.init();
       if (!this._hdWalletInstance) throw new Error('Internal error: _hdWalletInstance is not initialized');
       return this._hdWalletInstance.fetchTransactions();
     } else {
-      // return LegacyWallet.prototype.fetchBalance.call(this);
       return super.fetchTransactions();
     }
   }
 
   async getAddressAsync(): Promise<string> {
-    if (this.isAddressValid(this.secret)) return new Promise(resolve => resolve(this.secret));
+    if (this.isAddressValid(this.secret)) return Promise.resolve(this.secret);
     if (this._hdWalletInstance) return this._hdWalletInstance.getAddressAsync();
     throw new Error('Not initialized');
   }
@@ -203,6 +207,12 @@ export class WatchOnlyWallet extends LegacyWallet {
     return super.getUtxo(...args);
   }
 
+  // Same path as createTransaction — needed so SendDetails fee matches the PSBT (#8803)
+  coinselect(...args: Parameters<LegacyWallet['coinselect']>) {
+    if (this._hdWalletInstance) return this._hdWalletInstance.coinselect(...args);
+    return super.coinselect(...args);
+  }
+
   combinePsbt(...args: Parameters<THDWalletForWatchOnly['combinePsbt']>) {
     if (this._hdWalletInstance) return this._hdWalletInstance.combinePsbt(...args);
     throw new Error('Not initialized');
@@ -233,8 +243,8 @@ export class WatchOnlyWallet extends LegacyWallet {
 
   getMasterFingerprintHex() {
     if (!this.masterFingerprint) return '00000000';
-    let masterFingerprintHex = Number(this.masterFingerprint).toString(16);
-    if (masterFingerprintHex.length < 8) masterFingerprintHex = '0' + masterFingerprintHex; // conversion without explicit zero might result in lost byte
+    // toString(16) drops leading zeros; one extra '0' is not enough when the high byte is 00
+    const masterFingerprintHex = Number(this.masterFingerprint).toString(16).padStart(8, '0');
     // poor man's little-endian conversion:
     // ¯\_(ツ)_/¯
     return (
@@ -265,7 +275,7 @@ export class WatchOnlyWallet extends LegacyWallet {
   }
 
   allowMasterFingerprint() {
-    return this.getSecret().startsWith('zpub') || this.getSecret().startsWith('ypub') || this.getSecret().startsWith('xpub');
+    return this.isHd();
   }
 
   useWithHardwareWalletEnabled() {
@@ -324,9 +334,45 @@ export class WatchOnlyWallet extends LegacyWallet {
     throw new Error("Not a HD watch-only wallet, can't use derivation path");
   }
 
-  setDerivationPath(...args: Parameters<THDWalletForWatchOnly['setDerivationPath']>) {
-    if (this._hdWalletInstance) return this._hdWalletInstance.setDerivationPath(...args);
-    throw new Error("Not a HD watch-only wallet, can't use derivation path");
+  setDerivationPath(path: string) {
+    if (!this.isHd()) throw new Error("Not a HD watch-only wallet, can't use derivation path");
+    if (!this._hdWalletInstance) this.init();
+    if (!this._hdWalletInstance) throw new Error("Not a HD watch-only wallet, can't use derivation path");
+    // defensive: init() can still pick a class from this._derivationPath if segwitType is unset
+    if (!this.segwitType) {
+      this.segwitType = this._hdWalletInstance.segwitType ?? 'p2pkh';
+    }
+    // keep this._derivationPath unchanged: getID() hashes it, so a metadata-only edit would change the wallet ID
+    this._hdWalletInstance.setDerivationPath(path);
+  }
+
+  setMasterFingerprintFromHex(hexValue: string) {
+    this.masterFingerprint = this.getMasterFingerprintFromHex(hexValue);
+  }
+
+  // wrap only export-safe 84/49/86 paths so setSecret's mapping applies
+  setSecretForCustomPathImport(importText: string, path: string): this {
+    const wrapPath = path.startsWith("m/84'/0'/") || path.startsWith("m/49'/0'/") || path.startsWith("m/86'");
+    const trimmed = importText.trim();
+    // skip key-origin forms; wrapping would replace their fingerprint
+    if (wrapPath && trimmed.startsWith('xpub') && !trimmed.includes('[')) {
+      this.setSecret(trimmed);
+      if (this.valid() && this.isHd()) {
+        return this.setSecret(`[00000000/${path.replace(/^m\//, '')}]${trimmed}`);
+      }
+    }
+    return this.setSecret(importText);
+  }
+
+  // taproot secret is a bare xpub; export tr() so re-import is not legacy
+  getSecretForExport(): string {
+    try {
+      if (this.segwitType === 'p2tr' || this._hdWalletInstance instanceof HDTaprootWallet) {
+        const path = this.getDerivationPath();
+        if (path) return WalletDescriptor.getDescriptor(this.getMasterFingerprintHex(), path, this.getSecret(), 'p2tr');
+      }
+    } catch (_) {}
+    return this.getSecret();
   }
 
   isSegwit(): boolean {

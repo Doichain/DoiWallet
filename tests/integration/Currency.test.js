@@ -61,7 +61,7 @@ describe('currency', () => {
   // one currency per rate source, so it is visible which API is the one that stopped answering
   for (const [unit, source] of [
     [FiatUnit.USD, 'Coinpaprika'],
-    [FiatUnit.JPY, 'CoinGecko'],
+    [FiatUnit.JPY, 'Kraken'],
     [FiatUnit.ARS, 'Yadio'],
     [FiatUnit.LBP, 'YadioConvert'],
     [FiatUnit.INR, 'coinpaprika'],
@@ -78,11 +78,10 @@ describe('currency', () => {
     });
   }
 
-  it('keeps the rate it already had when a source stops answering', async () => {
+  it('falls back when a source stops answering, and keeps the rates it already had', async () => {
     // Exir serves only Iran and answers 403 here, which makes it a real unreachable source rather
-    // than a mocked one. Losing a source has to leave the last known rate in place - the amounts on
-    // the wallet screen are read from it - and has to be flagged, which is what turns the rate stale
-    // in the UI.
+    // than a mocked one. Since BlueWallet 8.0.2 a failing source falls through to the next one, so
+    // IRT still gets a rate; the rate already stored for another currency must stay as it was.
     assert.strictEqual(FiatUnit.IRT.source, 'Exir', 'IRT no longer comes from Exir');
 
     await setPreferredCurrency(FiatUnit.USD);
@@ -94,7 +93,7 @@ describe('currency', () => {
     await initCurrencyDaemon(true);
 
     const after = await storedRates();
+    assert.ok(after.BTC_IRT > 0, 'no IRT rate from the fallback');
     assert.strictEqual(after.BTC_USD, before.BTC_USD, 'the known rate was lost');
-    assert.strictEqual(after.LAST_UPDATED_ERROR, true, 'the failure was not flagged');
   });
 });

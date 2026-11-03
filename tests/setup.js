@@ -7,7 +7,8 @@ console.warn = (...args) => {
   if (
     typeof args[0] === 'string' &&
     (args[0].startsWith('WARNING: Sending to a future segwit version address can lead to loss of funds') ||
-      args[0].startsWith('only compressed public keys are good'))
+      args[0].startsWith('only compressed public keys are good') ||
+      args[0].startsWith('Using standard fetch instead of expo/fetch'))
   ) {
     return;
   }
@@ -36,7 +37,9 @@ console.debug = console.log = (...args) => {
 
 global.net = require('net'); // needed by Electrum client. For RN it is proviced in shim.js
 global.tls = require('tls'); // needed by Electrum client. For RN it is proviced in shim.js
-global.fetch = require('node-fetch');
+if (typeof globalThis.fetch !== 'function') {
+  throw new Error('Native fetch missing; Node >= 22.11 is required (see package.json engines)');
+}
 
 jest.mock('@react-native-clipboard/clipboard', () => mockClipboard);
 
@@ -55,14 +58,6 @@ jest.mock('react-native-capture-protection', () => ({
     isScreenRecording: jest.fn(() => Promise.resolve(false)),
   },
 }));
-
-jest.mock('react-native-watch-connectivity', () => {
-  return {
-    getIsWatchAppInstalled: jest.fn(() => Promise.resolve(false)),
-    subscribeToMessages: jest.fn(),
-    updateApplicationContext: jest.fn(),
-  };
-});
 
 jest.mock('react-native-secure-key-store', () => {
   return {};
@@ -229,7 +224,12 @@ jest.mock('react-native-fs', () => {
   };
 });
 
-jest.mock('@react-native-documents/picker', () => ({}));
+jest.mock('@react-native-documents/picker', () => ({
+  saveDocuments: jest.fn(async ({ sourceUris }) => {
+    const sourceUri = Array.isArray(sourceUris) && sourceUris.length > 0 ? sourceUris[0] : 'file:///mock/unknown';
+    return [{ uri: sourceUri, name: 'mock', error: null }];
+  }),
+}));
 
 jest.mock('react-native-haptic-feedback', () => ({}));
 
@@ -480,6 +480,17 @@ jest.mock('../blue_modules/analytics', () => {
   const ret = jest.fn();
   ret.ENUM = { CREATED_WALLET: '' };
   return ret;
+});
+
+// addInvoice() registers a fire-and-forget payment-push callback; disable the
+// URI in unit tests so node-fetch does not leave in-flight handles after the
+// suite exits (which makes Jest fail with "did not exit one second after").
+jest.mock('../blue_modules/constants', () => {
+  const actual = jest.requireActual('../blue_modules/constants');
+  return {
+    ...actual,
+    arkadePaymentPushUri: '',
+  };
 });
 
 jest.mock('react-native-share', () => {

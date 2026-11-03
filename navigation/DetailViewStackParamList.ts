@@ -1,10 +1,12 @@
 import { AztecoVoucher } from '../class/azteco';
+import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { LightningTransaction, TWallet } from '../class/wallets/types';
 import { DoichainUnit, Chain } from '../models/doichainUnits';
 import { PromptPasswordConfirmationParams } from '../screen/PromptPasswordConfirmationSheet.types';
 import { ElectrumServerItem } from '../screen/settings/ElectrumSettings';
 import { NavigatorScreenParams } from '@react-navigation/native';
 import { SendDetailsParams, SendDetailsStackParamList, TNavigationWrapper } from './SendDetailsStackParamList';
+import { ClipboardPaymentKind } from '../blue_modules/clipboardPayment';
 
 export type ScanQRCodeParamList = {
   cameraStatusGranted?: boolean;
@@ -32,11 +34,23 @@ type VaultKeyData = {
   exportString?: string;
 };
 
+type HeaderLeftRenderer = NonNullable<NativeStackNavigationOptions['headerLeft']>;
+type HeaderRightRenderer = NonNullable<NativeStackNavigationOptions['headerRight']>;
+
 export type DetailViewStackParamList = {
   DrawerRoot: undefined;
   UnlockWithScreen: undefined;
+  KeyboardShortcuts: undefined;
   WalletsList: { onBarScanned?: string };
-  WalletTransactions: { isLoading?: boolean; walletID: string; walletType: string; onBarScanned?: string };
+  WalletTransactions: {
+    isLoading?: boolean;
+    walletID: string;
+    walletType: string;
+    onBarScanned?: string;
+    headerIsScrolled?: boolean;
+    headerWalletLabel?: string;
+    headerWalletBalance?: string;
+  };
   WalletDetails: { walletID: string };
   // TODO: type tx properly once Transaction and ElectrumTransaction are unified
   TransactionStatus: { hash: string; walletID: string; tx?: any };
@@ -97,7 +111,7 @@ export type DetailViewStackParamList = {
   NetworkSettings: undefined;
   About: undefined;
   // DefaultView: undefined; // Commented out - not accessible from UI
-  ElectrumSettings: { server?: ElectrumServerItem; onBarScanned?: string };
+  ElectrumSettings: { server?: ElectrumServerItem; onBarScanned?: string; headerRight?: HeaderRightRenderer | null };
   SettingsBlockExplorer: undefined;
   PlausibleDeniability: undefined;
   EncryptStorage: undefined;
@@ -113,6 +127,7 @@ export type DetailViewStackParamList = {
   ViewEditMultisigCosigners: {
     walletID: string;
     cosigners: string[];
+    headerRight?: HeaderRightRenderer | null;
     sheetAction?: string;
     sheetImportText?: string;
     sheetAskPassphrase?: boolean;
@@ -142,6 +157,12 @@ export type DetailViewStackParamList = {
   ReceiveDetails: {
     walletID?: string;
     address: string;
+    allowBIP47?: boolean;
+    isBIP47Enabled?: boolean;
+    toggleBIP47RequestedAt?: number;
+    headerLeft?: HeaderLeftRenderer;
+    headerRight?: HeaderRightRenderer;
+    headerBackVisible?: boolean;
   };
   ReceiveCustomAmount: {
     address: string;
@@ -150,6 +171,16 @@ export type DetailViewStackParamList = {
     currentUnit?: DoichainUnit;
     preferredUnit?: DoichainUnit;
   };
+  ReceiveMoreOptions: {
+    address: string;
+    currentLabel?: string;
+    currentAmount?: string;
+    currentUnit?: DoichainUnit;
+    preferredUnit?: DoichainUnit;
+  };
+  ReceiveAddressLabel: {
+    address: string;
+  };
   ScanQRCode: ScanQRCodeParamList;
   PaymentCodeList: {
     paymentCode: string;
@@ -157,4 +188,9 @@ export type DetailViewStackParamList = {
   };
   PromptPasswordConfirmationSheet: PromptPasswordConfirmationParams | undefined;
   ManageWallets: undefined;
+  ClipboardDetected: {
+    payload: string;
+    kind: ClipboardPaymentKind;
+    contentHash: string;
+  };
 };

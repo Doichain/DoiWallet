@@ -50,13 +50,13 @@ const ReplaceFeeSuggestions: React.FC<ReplaceFeeSuggestionsProps> = ({ onFeeSele
 
       if (cachedNetworkTransactionFees && 'fastestFee' in cachedNetworkTransactionFees) {
         setNetworkFees(cachedNetworkTransactionFees);
-        onFeeSelected(cachedNetworkTransactionFees.fastestFee);
+        onFeeSelected(adjustFee(cachedNetworkTransactionFees.fastestFee, transactionMinimum));
         setSelectedFeeType(NetworkTransactionFeeType.FAST);
       }
     } catch (_) {}
     const fees = await NetworkTransactionFees.recommendedFees();
     setNetworkFees(fees);
-    onFeeSelected(fees.fastestFee);
+    onFeeSelected(adjustFee(fees.fastestFee, transactionMinimum));
     setSelectedFeeType(NetworkTransactionFeeType.FAST);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -67,34 +67,40 @@ const ReplaceFeeSuggestions: React.FC<ReplaceFeeSuggestionsProps> = ({ onFeeSele
   }, []);
 
   const handleFeeSelection = (feeType: NetworkTransactionFeeType) => {
-    if (feeType !== NetworkTransactionFeeType.CUSTOM) {
-      Keyboard.dismiss();
+    if (feeType === NetworkTransactionFeeType.CUSTOM) {
+      setSelectedFeeType(feeType);
+      return;
     }
+
+    Keyboard.dismiss();
     if (networkFees) {
-      let selectedFee: number;
       switch (feeType) {
         case NetworkTransactionFeeType.FAST:
-          selectedFee = networkFees.fastestFee;
+          onFeeSelected(adjustFee(networkFees.fastestFee, transactionMinimum));
           break;
         case NetworkTransactionFeeType.MEDIUM:
-          selectedFee = networkFees.mediumFee;
+          onFeeSelected(adjustFee(networkFees.mediumFee, transactionMinimum));
           break;
         case NetworkTransactionFeeType.SLOW:
-          selectedFee = networkFees.slowFee;
-          break;
-        case NetworkTransactionFeeType.CUSTOM:
-          selectedFee = Number(customFeeValue);
+          onFeeSelected(adjustFee(networkFees.slowFee, transactionMinimum));
           break;
       }
-      onFeeSelected(selectedFee);
+
       setSelectedFeeType(feeType);
     }
   };
 
   const handleCustomFeeChange = (customFee: string) => {
-    const sanitizedFee = customFee.replace(/[^0-9]/g, '');
+    const sanitizedFee = customFee.replace(/[^\d.,]/g, '').replace(/([.,].*?)[.,]/g, '$1');
     setCustomFeeValue(sanitizedFee);
-    handleFeeSelection(NetworkTransactionFeeType.CUSTOM);
+    onFeeSelected(Number(sanitizedFee.replace(',', '.')));
+    setSelectedFeeType(NetworkTransactionFeeType.CUSTOM);
+  };
+
+  const adjustFee = (proposedFee: number, minimumFee: number) => {
+    if (proposedFee > minimumFee) return proposedFee;
+
+    return minimumFee + 0.5;
   };
 
   return (
@@ -105,21 +111,21 @@ const ReplaceFeeSuggestions: React.FC<ReplaceFeeSuggestionsProps> = ({ onFeeSele
             label: loc.send.fee_fast,
             time: loc.send.fee_10m,
             type: NetworkTransactionFeeType.FAST,
-            rate: networkFees.fastestFee,
+            rate: adjustFee(networkFees.fastestFee, transactionMinimum),
             active: selectedFeeType === NetworkTransactionFeeType.FAST,
           },
           {
             label: formatStringAddTwoWhiteSpaces(loc.send.fee_medium),
             time: loc.send.fee_3h,
             type: NetworkTransactionFeeType.MEDIUM,
-            rate: networkFees.mediumFee,
+            rate: adjustFee(networkFees.mediumFee, transactionMinimum),
             active: selectedFeeType === NetworkTransactionFeeType.MEDIUM,
           },
           {
             label: loc.send.fee_slow,
             time: loc.send.fee_1d,
             type: NetworkTransactionFeeType.SLOW,
-            rate: networkFees.slowFee,
+            rate: adjustFee(networkFees.slowFee, transactionMinimum),
             active: selectedFeeType === NetworkTransactionFeeType.SLOW,
           },
         ].map(({ label, type, time, rate, active }) => (
@@ -156,7 +162,10 @@ const ReplaceFeeSuggestions: React.FC<ReplaceFeeSuggestionsProps> = ({ onFeeSele
             ref={customTextInput}
             maxLength={9}
             style={[styles.customFeeInput, stylesHook.customFeeInput]}
-            onFocus={() => handleCustomFeeChange(customFeeValue)}
+            onFocus={() => {
+              setSelectedFeeType(NetworkTransactionFeeType.CUSTOM);
+              onFeeSelected(Number(customFeeValue));
+            }}
             placeholder={loc.send.fee_satvbyte}
             placeholderTextColor="#81868e"
             inputAccessoryViewID={DismissKeyboardInputAccessoryViewID}

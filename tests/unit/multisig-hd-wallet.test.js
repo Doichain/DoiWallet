@@ -1315,6 +1315,31 @@ describe('multisig-wallet (native segwit)', () => {
     assert.strictEqual(w.getDerivationPath(), ''); // unknown
   });
 
+  it('isValidElectrumSeed method detect valid electrum seed', () => {
+    assert.strictEqual(
+      MultisigHDWallet.isValidElectrumSeed('during pride layer jelly admit army want melody check witness favorite prosper'),
+      true,
+    );
+
+    assert.strictEqual(
+      MultisigHDWallet.isValidElectrumSeed('electrumseed:during pride layer jelly admit army want melody check witness favorite prosper'),
+      false,
+    );
+
+    assert.strictEqual(
+      MultisigHDWallet.isValidElectrumSeed(
+        'electrumseed:electrumseed:during pride layer jelly admit army want melody check witness favorite prosper',
+      ),
+      false,
+    );
+
+    // bip39 seed phrase is not a valid electrum seed
+    assert.strictEqual(
+      MultisigHDWallet.isValidElectrumSeed('hybrid husband luggage assume lake trend armed decorate grocery rebel hood unique'),
+      false,
+    );
+  });
+
   it('can import electrum json file format', () => {
     assert.strictEqual(MultisigHDWallet.ckccXfp2fingerprint(64392470), '168DD603');
     assert.strictEqual(MultisigHDWallet.ckccXfp2fingerprint('64392470'), '168DD603');
@@ -1408,6 +1433,39 @@ describe('multisig-wallet (native segwit)', () => {
       assert.ok(psbt);
       assert.ok(!tx);
     }
+  });
+
+  it('can import electrum json with h paths and no trailing slashes', () => {
+    const content = require('./fixtures/electrum-multisig-wallet-with-seed.json');
+
+    const originalStorage = JSON.parse(JSON.stringify(content));
+    const newStorage = JSON.parse(JSON.stringify(content));
+
+    for (let c = 1; c <= 3; c++) {
+      // test keys without trailing slashes
+      newStorage['x' + c] = newStorage['x' + c + '/'];
+      delete newStorage['x' + c + '/'];
+
+      // replace hardened notation
+      newStorage['x' + c].derivation = newStorage['x' + c].derivation.replaceAll("'", 'h');
+    }
+
+    const originalWallet = new MultisigHDWallet();
+    originalWallet.setSecret(JSON.stringify(originalStorage));
+
+    const newWallet = new MultisigHDWallet();
+    newWallet.setSecret(JSON.stringify(newStorage));
+
+    assert.strictEqual(newWallet.getM(), originalWallet.getM());
+    assert.strictEqual(newWallet.getN(), originalWallet.getN());
+
+    assert.strictEqual(newWallet.isNativeSegwit(), originalWallet.isNativeSegwit());
+
+    assert.deepStrictEqual(newWallet.getCustomDerivationPathForCosigner(1), originalWallet.getCustomDerivationPathForCosigner(1));
+
+    assert.deepStrictEqual(newWallet._getExternalAddressByIndex(0), originalWallet._getExternalAddressByIndex(0));
+
+    assert.deepStrictEqual(newWallet._getInternalAddressByIndex(0), originalWallet._getInternalAddressByIndex(0));
   });
 
   it.skip('can import electrum json file format with seeds and passphrase', () => {
@@ -1791,6 +1849,61 @@ describe('multisig-wallet (native segwit)', () => {
     assert.strictEqual(w.getCosignerPassphrase(1), undefined);
   });
 
+  it('can replace electrum seed with xpub and can replace xpub with electrum seed', () => {
+    const electrumWallet = new MultisigHDWallet();
+    const electrumJson = require('./fixtures/electrum-multisig-wallet-with-seed-and-passphrase.json');
+
+    electrumWallet.setSecret(JSON.stringify(electrumJson));
+
+    const newWallet = new MultisigHDWallet().setSecret(electrumWallet.getSecret());
+    assert.strictEqual(electrumWallet.getSecret(), newWallet.getSecret());
+    assert.strictEqual(electrumWallet.getN(), 2);
+    assert.strictEqual(electrumWallet.getM(), 2);
+    assert.strictEqual(
+      electrumWallet.getCosigner(1),
+      'electrumseed:diagram grape account sustain bright member ethics strategy burger senior capital enforce',
+    );
+    assert.strictEqual(electrumWallet.getFingerprint(1), '8DE7B2C3');
+    electrumWallet.replaceCosignerSeedWithXpub(1);
+    assert.strictEqual(
+      electrumWallet.getCosigner(1),
+      'Zpub6yVcJzRPEwQAjC2GsJSqZJTZAhf7VM6PGdin9jFTQ6zUia3aFtdn9WzXEZBk1AcgSgQ7kLcysk5CWTuJppjFKdYJDMYVT9hZF71PyPijNUF',
+    );
+    assert.strictEqual(electrumWallet.getFingerprint(1), '8DE7B2C3');
+    electrumWallet.replaceCosignerXpubWithSeed(
+      1,
+      'diagram grape account sustain bright member ethics strategy burger senior capital enforce',
+      'BlueWallet',
+    );
+    assert.strictEqual(
+      electrumWallet.getCosigner(1),
+      'electrumseed:diagram grape account sustain bright member ethics strategy burger senior capital enforce',
+    );
+    assert.strictEqual(electrumWallet.getFingerprint(1), '8DE7B2C3');
+    electrumWallet.replaceCosignerSeedWithXpub(1);
+
+    // not valid seed, it should be entered with the electrumseed prefix
+    assert.throws(
+      () =>
+        electrumWallet.replaceCosignerXpubWithSeed(
+          1,
+          'electrumseed:diagram grape account sustain bright member ethics strategy burger senior capital enforce',
+        ),
+      /Not a valid mnemonic phrase/,
+    );
+
+    // wrong passphrase
+    assert.throws(
+      () =>
+        electrumWallet.replaceCosignerXpubWithSeed(
+          1,
+          'diagram grape account sustain bright member ethics strategy burger senior capital enforce',
+          'wrong-passphrase',
+        ),
+      /Fingerprint of new seed doesnt match/,
+    );
+  });
+
   it.skip('can sign valid tx if we have more keys than quorum ("Too many signatures" error)', async () => {
     const w = new MultisigHDWallet();
     w.setSecret(
@@ -2157,6 +2270,31 @@ describe('multisig-cosigner', () => {
       c3.getXpub(),
       'Zpub74w9dfoeurKrKXE3SPRpFquLPTkiCuSwGuhDzBgbE42w5ShB2FxMjmJyjZpSJ6WhLt8y1PeFHQELGgq2GmktviFDH8yFWYRWg4xQiw3v335',
     );
+    assert.strictEqual(c3.getFp(), 'B68AF6E4');
+    assert.strictEqual(c3.getPath(), "m/48'/0'/0'/2'");
+  });
+
+  it('can parse unchained json', () => {
+    const unchainedJson = require('./fixtures/unchained.json');
+
+    const cosigner = new MultisigCosigner(JSON.stringify(unchainedJson));
+    assert.ok(cosigner.isValid());
+    assert.strictEqual(cosigner.howManyCosignersWeHave(), 3);
+    assert.strictEqual(cosigner.getFp(), '');
+    assert.strictEqual(cosigner.getXpub(), '');
+    assert.strictEqual(cosigner.getPath(), '');
+
+    const [c1, c2, c3] = cosigner.getAllCosigners();
+
+    assert.strictEqual(c1.getXpub(), unchainedJson.p2sh);
+    assert.strictEqual(c1.getFp(), 'B68AF6E4');
+    assert.strictEqual(c1.getPath(), "m/45'");
+
+    assert.strictEqual(c2.getXpub(), unchainedJson.p2sh_p2wsh);
+    assert.strictEqual(c2.getFp(), 'B68AF6E4');
+    assert.strictEqual(c2.getPath(), "m/48'/0'/0'/1'");
+
+    assert.strictEqual(c3.getXpub(), unchainedJson.p2wsh);
     assert.strictEqual(c3.getFp(), 'B68AF6E4');
     assert.strictEqual(c3.getPath(), "m/48'/0'/0'/2'");
   });

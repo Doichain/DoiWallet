@@ -1,24 +1,16 @@
+import Clipboard from '@react-native-clipboard/clipboard';
+import useScreenMenuActions from '../../hooks/useScreenMenuActions';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
+import { useNavigation, RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import {
-  BackHandler,
-  Image,
-  ImageSourcePropType,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  useColorScheme,
-  View,
-} from 'react-native';
+import { BackHandler, Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import Animated, { Easing, Layout, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import Share from 'react-native-share';
 import * as BlueElectrum from '../../blue_modules/BlueElectrum';
 import { fiatToBTC, satoshiToBTC } from '../../blue_modules/currency';
 import triggerHapticFeedback, { HapticFeedbackTypes } from '../../blue_modules/hapticFeedback';
 import { majorTomToGroundControl, tryToObtainPermissions } from '../../blue_modules/notifications';
+import AddressLabelBadge from '../../components/AddressLabelBadge';
 import BlueButtonLink from '../../components/BlueButtonLink';
 import BlueCard from '../../components/BlueCard';
 import BlueText from '../../components/BlueText';
@@ -27,7 +19,6 @@ import presentAlert from '../../components/Alert';
 import Button from '../../components/Button';
 import CopyTextToClipboard, { CopyTextToClipboardHandle } from '../../components/CopyTextToClipboard';
 import HandOffComponent from '../../components/HandOffComponent';
-import HeaderMenuButton from '../../components/HeaderMenuButton';
 import QRCode from '../../components/QRCode';
 import SegmentedControl from '../../components/SegmentedControl';
 import { useTheme } from '../../components/themes';
@@ -35,11 +26,9 @@ import { TransactionPendingIconBig } from '../../components/TransactionPendingIc
 import { HandOffActivityType } from '../../components/types';
 import { useSettings } from '../../hooks/context/useSettings';
 import { useStorage } from '../../hooks/context/useStorage';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import loc, { formatBalance } from '../../loc';
 import { DoichainUnit, Chain } from '../../models/doichainUnits';
 import { ReceiveDetailsStackParamList } from '../../navigation/ReceiveDetailsStackParamList';
-import { CommonToolTipActions } from '../../typings/CommonToolTipActions';
 import { SuccessView } from '../send/success';
 import { BlueSpacing40 } from '../../components/BlueSpacing';
 import { BlueLoading } from '../../components/BlueLoading';
@@ -79,12 +68,6 @@ function staggerDelaysForRunKey(runKey: string, tileCount: number, maxDelayMs: n
 }
 
 const receiveAuxStyles = StyleSheet.create({
-  headerCloseButton: {
-    minWidth: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   qrRevealTile: {
     position: 'absolute',
   },
@@ -160,32 +143,15 @@ const QrStaggerReveal: React.FC<QrStaggerRevealProps> = ({ size, maskColor, runK
   );
 };
 
-type ReceiveDetailsCloseButtonProps = {
-  closeImage: ImageSourcePropType;
-  onPress: () => void;
-};
-
-const ReceiveDetailsCloseButton: React.FC<ReceiveDetailsCloseButtonProps> = ({ closeImage, onPress }) => (
-  <TouchableOpacity
-    accessibilityRole="button"
-    accessibilityLabel={loc._.close}
-    style={receiveAuxStyles.headerCloseButton}
-    onPress={onPress}
-    testID="NavigationCloseButton"
-  >
-    <Image source={closeImage} />
-  </TouchableOpacity>
-);
-
 type NavigationProps = NativeStackNavigationProp<ReceiveDetailsStackParamList, 'ReceiveDetails'>;
 type RouteProps = RouteProp<ReceiveDetailsStackParamList, 'ReceiveDetails'>;
 
 const ReceiveDetails = () => {
   const route = useRoute<RouteProps>();
   const { walletID, address } = route.params;
-  const { wallets, saveToDisk, sleep, fetchAndSaveWalletTransactions } = useStorage();
+  const { wallets, saveToDisk, sleep, fetchAndSaveWalletTransactions, addressMetadata } = useStorage();
   const { isElectrumDisabled } = useSettings();
-  const { colors, closeImage } = useTheme();
+  const { colors } = useTheme();
   const isDarkTheme = useColorScheme() === 'dark';
   const [customLabel, setCustomLabel] = useState('');
   const [customAmount, setCustomAmount] = useState('');
@@ -196,7 +162,7 @@ const ReceiveDetails = () => {
   const [showConfirmedBalance, setShowConfirmedBalance] = useState(false);
   const [showAddress, setShowAddress] = useState(false);
   const [currentTab, setCurrentTab] = useState(segmentControlValues[0]);
-  const { goBack, setParams, setOptions, navigate } = useExtendedNavigation<NavigationProps>();
+  const { goBack, setParams, navigate } = useNavigation<NavigationProps>();
   const [intervalMs, setIntervalMs] = useState(5000);
   const [eta, setEta] = useState('');
   const [initialConfirmed, setInitialConfirmed] = useState(0);
@@ -238,6 +204,15 @@ const ReceiveDetails = () => {
   });
 
   const copyRef = useRef<CopyTextToClipboardHandle>(null);
+  useScreenMenuActions({
+    copyAddress:
+      showAddress && currentTab === segmentControlValues[0] && !!address
+        ? () => {
+            Clipboard.setString(address);
+            triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
+          }
+        : undefined,
+  });
   const scrollLayoutRef = useRef({ width: 0, height: 0 });
   const pressScale = useSharedValue(1);
   const pressAnimatedStyle = useAnimatedStyle(() => ({
@@ -327,14 +302,6 @@ const ReceiveDetails = () => {
     }
   }, [wallet, saveToDisk, address, setAddressBIP21Encoded, isElectrumDisabled, sleep]);
 
-  const onEnablePaymentsCodeSwitchValue = useCallback(() => {
-    if (wallet && wallet.allowBIP47()) {
-      wallet.switchBIP47(!wallet.isBIP47Enabled());
-    }
-    saveToDisk();
-    obtainWalletAddress();
-  }, [wallet, saveToDisk, obtainWalletAddress]);
-
   useEffect(() => {
     if (showConfirmedBalance) {
       triggerHapticFeedback(HapticFeedbackTypes.NotificationSuccess);
@@ -347,48 +314,13 @@ const ReceiveDetails = () => {
     }
   }, [address, isCustom, setAddressBIP21Encoded]);
 
-  const toolTipActions = useMemo(() => {
-    const action = { ...CommonToolTipActions.PaymentsCode };
-    action.menuState = isBIP47Enabled;
-    return [action];
-  }, [isBIP47Enabled]);
+  // Derived read: the label sheet mutates addressMetadata in place, and saving re-renders this screen.
+  const addressLabel = address ? (addressMetadata[address]?.label ?? '') : '';
 
-  const onPressMenuItem = useCallback(() => {
-    onEnablePaymentsCodeSwitchValue();
-  }, [onEnablePaymentsCodeSwitchValue]);
-
-  const HeaderRight = useMemo(
-    () => <HeaderMenuButton actions={toolTipActions} onPressMenuItem={onPressMenuItem} />,
-    [onPressMenuItem, toolTipActions],
-  );
-
-  const renderHeaderCloseButton = useCallback(
-    () => <ReceiveDetailsCloseButton closeImage={closeImage} onPress={goBack} />,
-    [closeImage, goBack],
-  );
-
-  const renderHeaderRightMenu = useCallback(() => HeaderRight, [HeaderRight]);
-
-  useEffect(() => {
-    const androidNoDuplicateBack = Platform.OS === 'android' ? { headerBackVisible: false as const } : {};
-
-    if (wallet?.allowBIP47() && isBIP47Enabled) {
-      setOptions({
-        ...androidNoDuplicateBack,
-        headerLeft: renderHeaderCloseButton,
-        headerRight: renderHeaderRightMenu,
-      });
-      return;
-    }
-
-    // When payment-code menu is hidden, move close button to the right.
-    // Android: static `navigationStyle` uses `headerBackImageSource` for left "close"; hide back so only `headerRight` shows.
-    setOptions({
-      ...androidNoDuplicateBack,
-      headerLeft: () => null,
-      headerRight: renderHeaderCloseButton,
-    });
-  }, [isBIP47Enabled, renderHeaderCloseButton, renderHeaderRightMenu, setOptions, wallet]);
+  const navigateToAddressLabel = useCallback(() => {
+    if (!address) return;
+    navigate('ReceiveAddressLabel', { address });
+  }, [address, navigate]);
 
   // re-fetching address balance periodically
   useEffect(() => {
@@ -695,9 +627,9 @@ const ReceiveDetails = () => {
     }, [wallet, address, obtainWalletAddress, setAddressBIP21Encoded, isCustom, hasIncomingCustomParams]),
   );
 
-  const showCustomAmountModal = useCallback(() => {
+  const showMoreOptionsSheet = useCallback(() => {
     if (!address) return;
-    navigate('ReceiveCustomAmount', {
+    navigate('ReceiveMoreOptions', {
       address,
       currentLabel: customLabel,
       currentAmount: customAmount,
@@ -797,6 +729,15 @@ const ReceiveDetails = () => {
         onLayout={onScrollViewLayout}
       >
         {showAddress && renderReceiveCard()}
+        {showAddress && currentTab === segmentControlValues[0] && addressLabel ? (
+          <AddressLabelBadge
+            label={addressLabel}
+            style={styles.addressLabelPill}
+            onPress={navigateToAddressLabel}
+            accessibilityLabel={`${loc.receive.option_label}: ${addressLabel}`}
+            testID="ReceiveAddressLabel"
+          />
+        ) : null}
         {showReceiveSkeleton && renderReceiveSkeleton()}
         {showAddress && address !== undefined && (
           <HandOffComponent title={loc.send.details_address} type={HandOffActivityType.ReceiveOnchain} userInfo={{ address }} />
@@ -815,9 +756,9 @@ const ReceiveDetails = () => {
             {showAddress && currentTab === loc.wallets.details_address && (
               <BlueButtonLink
                 style={styles.link}
-                testID="SetCustomAmountButton"
-                title={loc.receive.details_setAmount}
-                onPress={showCustomAmountModal}
+                testID="ReceiveMoreOptionsButton"
+                title={loc.receive.details_more_options}
+                onPress={showMoreOptionsSheet}
               />
             )}
             <Button
@@ -920,6 +861,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     minHeight: 48,
     justifyContent: 'center',
+  },
+  addressLabelPill: {
+    alignSelf: 'center',
+    maxWidth: '86%',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: 8,
   },
   bip47NotFoundContainer: {
     paddingVertical: 40,

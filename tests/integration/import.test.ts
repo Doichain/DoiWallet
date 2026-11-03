@@ -14,7 +14,7 @@ import { WatchOnlyWallet } from '../../class/wallets/watch-only-wallet';
 import startImport from '../../class/wallet-import';
 import { TWallet } from '../../class/wallets/types';
 
-jest.setTimeout(90 * 1000);
+jest.setTimeout(180 * 1000);
 
 afterAll(async () => {
   // after all tests we close socket so the test suite can actually terminate

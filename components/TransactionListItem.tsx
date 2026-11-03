@@ -1,7 +1,8 @@
+import { useNavigation } from '@react-navigation/native';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Clipboard from '@react-native-clipboard/clipboard';
-import { Animated, Easing, Image, Linking, Pressable, Text, TextStyle, ViewStyle, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Image, Linking, Pressable, Text, TextStyle, ViewStyle, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Lnurl from '../class/lnurl';
 import { LightningTransaction, Transaction } from '../class/wallets/types';
 import TransactionExpiredIcon from '../components/icons/TransactionExpiredIcon';
@@ -18,7 +19,6 @@ import { getIPFSImageUrl } from '../utils/ipfs';
 import { useSettings } from '../hooks/context/useSettings';
 import { useTheme } from './themes';
 import { Action } from './types';
-import { useExtendedNavigation } from '../hooks/useExtendedNavigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { DetailViewStackParamList } from '../navigation/DetailViewStackParamList';
 import { useStorage } from '../hooks/context/useStorage';
@@ -34,9 +34,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-  },
-  dateLine: {
-    fontSize: 13,
   },
   fullWidthButton: {
     width: '100%',
@@ -135,10 +132,11 @@ const TransactionListItemComponent: React.FC<TransactionListItemProps> = ({
   disableNavigation = false,
 }: TransactionListItemProps) => {
   const { colors } = useTheme();
-  const { navigate } = useExtendedNavigation<NavigationProps>();
-  const { txMetadata, counterpartyMetadata, wallets } = useStorage();
+  const { navigate } = useNavigation<NavigationProps>();
+  const { txMetadata, counterpartyMetadata, addressMetadata, wallets } = useStorage();
   const { language, selectedBlockExplorer } = useSettings();
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
   const containerStyle = useMemo(
     () => ({
       backgroundColor: colors.background,
@@ -158,7 +156,7 @@ const TransactionListItemComponent: React.FC<TransactionListItemProps> = ({
   if (item.counterparty) {
     counterparty = counterpartyMetadata?.[item.counterparty]?.label ?? item.counterparty;
   }
-  const txMemo = (counterparty ? `[${shortenContactName(counterparty)}] ` : '') + (txMetadata[item.hash]?.memo ?? '');
+  const txMemo = (counterparty ? `[${shortenContactName(counterparty)}] ` : '') + (txMetadata?.[item.hash]?.memo ?? '');
   const noteForCopy = (txMemo || item.memo || '').trim() || undefined;
 
   // A name operation shows the name it carries next to the note. A name_new only commits to a hash
@@ -170,7 +168,27 @@ const TransactionListItemComponent: React.FC<TransactionListItemProps> = ({
     }
     return undefined;
   }, [item.outputs]);
-  const rightNote = [nameLabel, noteForCopy].filter(Boolean).join(' ') || undefined;
+  // Labels of every address in this tx, comma separated. Not memoized: addressMetadata is mutated in
+  // place, so a useMemo keyed on it would return a stale label after every edit.
+  const addressLabel = ((): string | undefined => {
+    if (!addressMetadata || Object.keys(addressMetadata).length === 0) return undefined;
+    const labels = new Set<string>();
+    const txAddresses = [
+      ...(item.outputs ?? []).flatMap(o => o?.scriptPubKey?.addresses ?? []),
+      ...(item.inputs ?? []).flatMap(i => i?.addresses ?? (i?.address ? [i.address] : [])),
+    ];
+    for (const addr of txAddresses) {
+      const label = addressMetadata[addr]?.label;
+      if (label) labels.add(label);
+    }
+    return labels.size > 0 ? [...labels].join(', ') : undefined;
+  })();
+
+  // Priority: contact > memo/note > address label > empty.
+  const rightSubtitle = counterparty ? noteForCopy : (txMetadata?.[item.hash]?.memo || item.memo || '').trim() || addressLabel;
+
+  // A name operation shows the name it carries in front of whatever upstream puts on the right.
+  const rightNote = [nameLabel, rightSubtitle].filter(Boolean).join(' ') || undefined;
 
   const [ipfsImageUrl, setIpfsImageUrl] = useState<string | null>(null);
   const [isLoadingImage, setIsLoadingImage] = useState<boolean>(false);
@@ -274,6 +292,7 @@ const TransactionListItemComponent: React.FC<TransactionListItemProps> = ({
       color,
       fontSize: 14,
       fontWeight: '600' as TextStyle['fontWeight'],
+      lineHeight: Math.round(20 * fontScale),
       textAlign: 'right',
       paddingRight: insets.right,
       paddingLeft: insets.left,
@@ -288,6 +307,7 @@ const TransactionListItemComponent: React.FC<TransactionListItemProps> = ({
     item.ispaid,
     insets.right,
     insets.left,
+    fontScale,
   ]);
 
   const determineTransactionTypeAndAvatar = () => {
@@ -586,7 +606,7 @@ const TransactionListItemComponent: React.FC<TransactionListItemProps> = ({
         <ListItem
           leftAvatar={avatar}
           title={listTitle}
-          subtitle={<Text style={styles.dateLine}>{dateLine}</Text>}
+          subtitle={dateLine}
           chevron={false}
           rightTitle={rowTitle}
           rightTitleStyle={rowTitleStyle}

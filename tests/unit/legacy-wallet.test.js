@@ -1,5 +1,6 @@
 import assert from 'assert';
 import * as bitcoin from '@doichain/doichainjs-lib';
+import { DOICHAIN } from '../../blue_modules/network.js';
 
 import { LegacyWallet } from '../../class/wallets/legacy-wallet';
 
@@ -124,6 +125,25 @@ describe('Legacy wallet', () => {
       true,
     );
     assert.strictEqual(psbt.data.inputs.length, 1);
+  });
+
+  it('can create transaction that pays requested fee rate from uncompressed key', async () => {
+    // upstream's vectors, re-encoded for Doichain: the same key and script hash under Doichain's version bytes
+    const l = new LegacyWallet();
+    l.setSecret('73v9qf6ToM2mMjvnXRP6dpSMHsXq28bKAh7xHHPVrr13iCFZJvX');
+
+    const prevTx = new bitcoin.Transaction();
+    prevTx.addInput(new Uint8Array(32), 0);
+    prevTx.addOutput(bitcoin.address.toOutputScript(l.getAddress(), DOICHAIN), BigInt(100000));
+    const utxos = [{ txid: prevTx.getId(), vout: 0, value: 100000, txhex: prevTx.toHex() }];
+
+    let txNew = l.createTransaction(utxos, [{ value: 50000, address: '6Pvh46LXQDFgv37a3EevSon8Ss7XFG2My5' }], 1, l.getAddress());
+    assert.strictEqual(txNew.tx.outs.length, 2);
+    assert.ok(txNew.fee >= txNew.tx.virtualSize(), `fee ${txNew.fee} is below 1 sat/vbyte for ${txNew.tx.virtualSize()} vbytes`);
+
+    txNew = l.createTransaction(utxos, [{ address: '6Pvh46LXQDFgv37a3EevSon8Ss7XFG2My5' }], 1, l.getAddress());
+    assert.strictEqual(txNew.tx.outs.length, 1);
+    assert.ok(txNew.fee >= txNew.tx.virtualSize(), `fee ${txNew.fee} is below 1 sat/vbyte for ${txNew.tx.virtualSize()} vbytes`);
   });
 
   it("throws error if you can't create wallet from this entropy", async () => {

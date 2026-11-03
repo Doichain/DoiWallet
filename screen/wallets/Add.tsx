@@ -29,10 +29,9 @@ import { useStorage } from '../../hooks/context/useStorage';
 import { CommonToolTipActions } from '../../typings/CommonToolTipActions';
 import { Action } from '../../components/types';
 import HeaderMenuButton from '../../components/HeaderMenuButton';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AddWalletStackParamList } from '../../navigation/AddWalletStack';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import SafeAreaScrollView from '../../components/SafeAreaScrollView';
 import { BlueSpacing20, BlueSpacing40 } from '../../components/BlueSpacing';
 import { hexToUint8Array, uint8ArrayToHex } from '../../blue_modules/uint8array-extras';
@@ -115,7 +114,7 @@ const WalletsAdd: React.FC = () => {
   const { addWallet, saveToDisk } = useStorage();
   const { entropy: entropyHex, words } = useRoute<RouteProps>().params || {};
   const entropy = entropyHex ? hexToUint8Array(entropyHex) : undefined;
-  const { navigate, goBack, setOptions, setParams } = useExtendedNavigation<NavigationProps>();
+  const { navigate, goBack, setOptions, setParams } = useNavigation<NavigationProps>();
   const stylesHook = {
     advancedText: {
       color: colors.feeText,

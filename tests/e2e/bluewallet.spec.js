@@ -4,14 +4,16 @@ import { element, waitFor } from 'detox';
 
 import {
   confirmPasswordDialog,
+  dismissAlertByText,
   expectToBeVisible,
   extractTextFromElementById,
   goBack,
   hashIt,
   helperCreateWallet,
   helperDeleteWallet,
+  restoreSynchronizationIfAnimatedQrClosed,
   scanText,
-  scrollUpOnHomeScreen,
+  scanUrParts,
   setCustomFeeRate,
   sleep,
   tapAndTapAgainIfElementIsNotVisible,
@@ -120,11 +122,11 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await goBack();
 
     // language
-    // change language to Chinese (ZH), test it and switch back to English
+    // change language to Afrikaans, test it and switch back to English
     await element(by.id('Language')).tap();
-    await element(by.text('Chinese (ZH)')).tap();
+    await element(by.text('Afrikaans (AFR)')).tap();
     await goBack();
-    await expect(element(by.text('语言'))).toBeVisible();
+    await expect(element(by.text('Taal'))).toBeVisible();
     await element(by.id('Language')).tap();
     await element(by.text('English')).tap();
     await goBack();
@@ -200,31 +202,36 @@ describe('BlueWallet UI Tests - no wallets', () => {
       await waitFor(element(by.id('NotificationsSwitch')))
         .toBeVisible()
         .withTimeout(10000);
-      await element(by.id('NotificationsSwitch')).tap();
 
-      // If notifications are not enabled on the device, an alert will appear
+      // Toggle notifications on/off. On iOS 26 simulators notifications are always
+      // denied, triggering a native UIAlertController whose buttons liquid glass
+      // can make un-tappable by Detox. If the alert cannot be dismissed, relaunch
+      // the app to recover instead of failing the entire settings test.
+      let notifDialogStuck = false;
       try {
-        await waitFor(element(by.text('OK')))
-          .toBeVisible()
-          .withTimeout(3000);
-        await element(by.text('OK')).tap();
-      } catch (_) {
-        // Alert not shown, which is fine - notifications might be enabled
-      }
-      await element(by.id('NotificationsSwitch')).tap();
-
-      // If notifications are not enabled on the device, an alert will appear
-      try {
-        await waitFor(element(by.text('OK')))
-          .toBeVisible()
-          .withTimeout(3000);
-        await element(by.text('OK')).tap();
-      } catch (_) {
-        // Alert not shown, which is fine - notifications might be enabled
+        await element(by.id('NotificationsSwitch')).tap();
+        const dismissed1 = await dismissAlertByText('OK', 10000);
+        if (dismissed1) {
+          await sleep(500);
+          await element(by.id('NotificationsSwitch')).tap();
+          await dismissAlertByText('OK', 10000);
+        } else {
+          notifDialogStuck = true;
+        }
+      } catch (e) {
+        console.warn('Notifications toggle skipped due to alert interaction issue:', e.message);
+        notifDialogStuck = true;
       }
 
-      await goBack();
-      await goBack();
+      if (notifDialogStuck) {
+        // Dialog blocks all interaction; relaunch the app to clear it
+        await device.launchApp({ newInstance: true });
+        await waitForId('WalletsList');
+        await element(by.id('SettingsButton')).tap();
+      } else {
+        await goBack();
+        await goBack();
+      }
     } else {
       await goBack();
     }
@@ -283,7 +290,8 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await element(by.text('Yes, I have.')).tap();
     await waitForId('BitcoinAddressQRCode');
     await waitForId('CopyTextToClipboard');
-    await element(by.id('SetCustomAmountButton')).tap();
+    await element(by.id('ReceiveMoreOptionsButton')).tap();
+    await element(by.id('ReceiveWithAmountOption')).tap();
     await element(by.id('BitcoinAmountInput')).replaceText('1');
     await element(by.id('CustomAmountDescription')).replaceText('test');
     await element(by.id('CustomAmountDescription')).tapReturnKey();
@@ -294,6 +302,22 @@ describe('BlueWallet UI Tests - no wallets', () => {
 
     await waitForId('BitcoinAddressQRCode');
     await waitForId('CopyTextToClipboard');
+
+    // add per-address label then verify it renders on the receive screen
+    // The link can be partially visible above the system navigation bar on
+    // short screens, so always move it fully into the viewport before tapping.
+    await element(by.id('ReceiveDetailsScrollView')).scrollTo('bottom');
+    await waitFor(element(by.id('ReceiveMoreOptionsButton')))
+      .toBeVisible()
+      .withTimeout(5000);
+    await element(by.id('ReceiveMoreOptionsButton')).tap();
+    await element(by.id('AddressLabelOption')).tap();
+    await element(by.id('AddressLabelInput')).replaceText('my recv label');
+    // Done saves the label and closes the sheet.
+    await element(by.id('AddressLabelInput')).tapReturnKey();
+    await waitForKeyboardToClose();
+    await waitForId('ReceiveAddressLabel');
+    await expect(element(by.text('my recv label'))).toBeVisible();
 
     // ManageWallets: relaunch to clear receive modal, then open via long-press, swipe-to-hide, verify persists across restart
     await device.launchApp({ newInstance: true });
@@ -321,6 +345,14 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await element(by.id('SwipeShowBalance')).tap();
     await element(by.id('NavigationCloseButton')).tap();
     await waitForId('WalletsList');
+
+    // address label persisted, reopen receive and verify it's still there
+    await tapAndTapAgainIfElementIsNotVisible('cr34t3d', 'ReceiveButton');
+    await element(by.id('ReceiveButton')).tap();
+    await waitForId('BitcoinAddressQRCode');
+    await waitForId('ReceiveAddressLabel');
+    await expect(element(by.text('my recv label'))).toBeVisible();
+    await goBack();
 
     process.env.CI && require('fs').writeFileSync(lockFile, '1');
   });
@@ -439,7 +471,6 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await waitForKeyboardToClose();
     await confirmPasswordDialog(); // first time might not always work
     await sleep(1000); // propagate
-    await scrollUpOnHomeScreen();
 
     // created fake storage.
     // creating a wallet inside this fake storage
@@ -480,7 +511,6 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await waitForKeyboardToClose();
     await confirmPasswordDialog(); // in case it didnt work first time
     await sleep(1000); // propagate
-    await scrollUpOnHomeScreen();
     await expect(element(by.text('fake_wallet'))).toBeVisible();
 
     process.env.CI && require('fs').writeFileSync(lockFile, '1');
@@ -528,12 +558,6 @@ describe('BlueWallet UI Tests - no wallets', () => {
       await waitForId('Wallets');
     }
     await sleep(1000); // propagate
-    // Match t4's flow: scroll up so the next helperCreateWallet's
-    // whileElement(WalletsList).scroll('right') starts from a known
-    // position. Without this, Android lands the user on a list state
-    // where CreateAWallet is not visible after scroll-right and the
-    // 6s tapAndTapAgainIfElementIsNotVisible budget runs out.
-    await scrollUpOnHomeScreen();
     // created fake storage.
     // creating a wallet inside this fake storage
     await helperCreateWallet('fake_wallet');
@@ -623,7 +647,6 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await element(by.id('CreateButton')).tap();
     await waitForText('OK');
     await tapIfTextPresent('OK');
-    await scrollUpOnHomeScreen();
     await waitForId('Multisig Vault');
     await element(by.id('Multisig Vault')).tap(); // go inside the wallet
     await waitForId('ReceiveButton');
@@ -664,21 +687,24 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await element(by.id('ScanImport')).tap();
 
     const urs = [
-      'UR:BYTES/1OF2/J8RX04F2WJ9SSY577U30R55ELM4LUCJCXJVJTD60SYV9A286Q0AQH7QXL6/TYQMJGEQGFK82E2HV9KXCET5YPXH2MR5D9EKJEEQWDJHGATSYPNXJMR9PG3JQARGD9EJQENFD3JJQCM0DE6XZ6TWWVSX7MNV0YS8QATZD35KXGRTV4UHXGRPDEJZQ6TNYPEKZEN9YP6X7Z3RYPJXJUM5WF5KYAT5V5SXZMT0DENJQCM0WD5KWMN9WFES5GC2FESK6EF6YPXH2MR5D9EKJEEQ2ESH2MR5PFGX7MRFVDUN5GPJYPHKVGPJPFZX2UNFWESHG6T0DCAZQMF0XSUZWTESYUHNQFE0XGNS53N0WFKKZAP6YPGRY46NFQ9Q53PNXAZ5Z3PC8QAZQKNSW43RWDRFDFCXV6Z92F9YU6NGGD94S5NNWP2XGNZ22C6K2M69D4F4YKNYFPC5GANS',
-      'UR:BYTES/2OF2/J8RX04F2WJ9SSY577U30R55ELM4LUCJCXJVJTD60SYV9A286Q0AQH7QXL6/8944VARY2EZHJ62CDVMHQKRC2F3XVKN629M8X3ZXWPNYGJZ9FPT8G4NS0Q6YG73EG3R42468DCE9S6E40FRN2AF5X4G4GNTNT9FNYAN2DA5YU5G2PGCNVWZYGSMRQVE6YPD8QATZXU6K6S298PZK57TC2DAX772SD4RKUEP4G5MY672YXAQ5C36WDEJ8YA2HWC6NY7RS0F5K6KJ3FD6KKAMKG4N9S4ZGW9K5SWRWVF3XXDNRVDGR2APJV9XNXMTHWVEHQJ6E2DHYKUZTF4XHJARYVF8Y2KJX24UYK7N6W3V5VNFC2PHQ5ZSJDYL5T',
+      'UR:BYTES/1-3/LPADAXCFADRFCYFTCKECHSHDMWHKADRHCNCXFWJZKPIHHGHSJZJZIHJYCXGTKPJZJYINJKINIOCXJKIHJYKPJOCXIYINJZIHBKCNCXJYISINJKCXIYINJZIHCXIAJLJTJYHSINJTJKCXJLJTJZKKCXJOKPIDJZINIACXJEIHKKJKCXHSJTIECXINJKCXJKHSIYIHCXJYJLBKCNCXIEINJKJYJPINIDKPJYIHCXHSJNJLJTIOCXIAJLJKINIOJTIHJPJKBKCNBKGLHSJNIHFTCXGTKPJZJYINJKINIOCXHFHSKPJZJYBKGDJLJZINIAKKFTCLFMLUMD',
+      'UR:BYTES/2-3/LPAOAXCFADRFCYFTCKECHSHDMWCXEYCXJLIYCXEYBKFYIHJPINKOHSJYINJLJTFTCXJNDLEEETDIDLDYDIDLDYDIDLEYDIBKFGJLJPJNHSJYFTCXGDEYHGGUFDBKBKFYEOEMFEFPFYETETFTCXHTJOKPIDEMEEINIMJOIYISFEGMGEGLIMISFXGRHDGMJKJOGHIEGSGEHFECIHJLFEJNGUGMHTIEFDJSFYKOJOESJEHFJYIEHFFEKKINHDJEEMJOHDKSGMIDIYHTKNGYKOJKFYFGJOIYFYFDFEFDHFJYHFJOKSEEFYKNESFYFLGOHGFLJTFWTDCLAY',
+      'UR:BYTES/3-3/LPAXAXCFADRFCYFTCKECHSHDMWEYHDJEECKNFLECKPEEECGYGHGTJKHKGUEYKOIMJLISGLGYBKBKFWENETFPFGENFEEEFTCXHTJOKPIDEMEEKTESIEIYJLIHKPJPGRJPGRHDFEEOGUGDGMJOFGJSKPGSGDGHJEINFXKPGUKTFLKPISFYKNFWIOIDFEEEEYKTECGUISFWEYFGKSGTIMJNGEKKIMHTJOGUGEENHGISGSJYETKKEHGDIHFGFDGYFEGSFLIOJSEYFLJNJEJYKOINFGFYFDETKKFGHGHKGMHGIOEEKSGYINKTEOKOEOEOECBKBKVAZEGAZT',
     ];
 
     await waitFor(element(by.id('UrProgressBar'))).toBeNotVisible();
 
-    for (const ur of urs) {
-      await scanText(ur);
-      await waitFor(element(by.id('UrProgressBar'))).toBeVisible();
-    }
+    try {
+      await scanUrParts(urs);
 
-    await waitForText('OK', 3 * 61000); // waiting for wallet import
-    await element(by.text('OK')).tap();
-    await scrollUpOnHomeScreen();
-    // ok, wallet imported
+      await waitForText('OK', 3 * 61000); // waiting for wallet import
+      await element(by.text('OK')).tap();
+    } finally {
+      if (!(await restoreSynchronizationIfAnimatedQrClosed())) {
+        console.warn('[detox] leaving sync disabled after multisig import: animated QR/scanner still open');
+      }
+    }
+    // ok, wallet imported — left the UR / QR import UI
 
     // lets go inside wallet
     const expectedWalletLabel = 'Multisig Vault';
@@ -691,7 +717,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
 
     await waitForId('AddressInput');
     await element(by.id('AddressInput')).replaceText('bc1q063ctu6jhe5k4v8ka99qac8rcm2tzjjnuktyrl');
-    await element(by.id('BitcoinAmountInput')).replaceText('0.0005');
+    await element(by.id('BitcoinAmountInput')).replaceText('0.00005');
     await element(by.id('BitcoinAmountInput')).tapReturnKey();
     await waitForKeyboardToClose();
 
@@ -714,43 +740,60 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await tapAndTapAgainIfElementIsNotVisible('CosignedScanOrImportFile', 'ScanQrBackdoorButton');
 
     const ursSignedByPassport = [
-      'UR:CRYPTO-PSBT/22-4/LPCMAACFAXPLCYZTVYVOPKHDWPHKAXPYJOIHIDHNJSATRTSWEYGUHDURWYDECAGLAAHTTBHTFZFPWDRTLROXLUEHCXAHJTIHTEHDHKTEVTOTIOWFSKGEOSCFFLDRGLFTCYKELSRDNSHYGLLEVYIDGYZOEEDAAOENHGASFDHFVWNSATVYCFETATZSFROXFPMHGUJNWDSPNYMHHGPAIMGYURAYCXLEZEZSCLKBJZLFSRAOOYMSYNCEHDOSPYGTTDSODRSKLALBCAVYBNOLOEGSOYVOVLMWFDPFHGBAVDAEAEAEADADWMDTGDPTADAEADADSTENFYASFDTBCLDINBAOHFHYTPPKWYMSSNDKHKKNUOIELPDRKTOYHPCFCSWNFXPKFZNEPKVOIOCNAOAXMNPSKPLTGYFLRHLOHGUYKISWBWVEGUGMLAAYDLLDLSAAVDTDSADLIDFXYLKKFYURMTOXLKMDRSTYTERSJNHSBDPSGOGWJKJESTWLZCTKGE',
-      'UR:CRYPTO-PSBT/52-4/LPCSEEAACFAXPLCYZTVYVOPKHDWPPECPWPHNLBGMLDGOMWJYMDASCFYTOEGRTDGMZOCXFGFEGOSPBDSBISPKCNNYNBIORDRLRTRTHGAAHLGDFWJTVWCEYKGLVEIODSYKKNMSBGNYSAZEZEADGHSAAEAEAECPAMAXCSPLEHGDWFSAGETNWLPRECKOSKDWURMKMYSOASBEBDBNLBFMESCHZEVSJTJKDNADCEENTDROWFVYWEPDRNMDSNYKPMRYZMRLMNRYPAAYBKTDCLGDJKIYBNTYFXECMKWFLSWFWPCPGYBKEHSETTOECANTRHKGFGCLSROLMYLKNSOLHGGDHPOXWPMWCKLYETCLMWAMIDISHKKPJTWDHFPTECMOBALNDABSPTAXAEAELAAEADAEAELSAOGDPTAEAHFLGMCLAXDWPLAHBSMTLSHFPKRLMTIYLRYATNLGPLWFLYHFTOTLRDWZHKBWLAHNFNCPWTIMRFLUVYHLBWKBCXGYNLFYDPOL',
-      'UR:CRYPTO-PSBT/76-4/LPCSGSAACFAXPLCYZTVYVOPKHDWPBKEHRTTTFDCTNTRHKGFGCXSAHSRHWDMDTONBRLROWMSFCPBTHNTIAAGMPLAEAECPAOAXFXPSGMTABNWEIAJTHSCLAOSERKVLJKADWEBKTBBTRKJPTPYKMKLTMSRYRKDYPLLKCECMLGTBAXDYAEAELAAEAEAELAAEAEAELAAOAEAELAADAEAEAEAEAEAEAECPAOAXCSMYGWCMSGFWBTIENEOTRHHDFTVTLYTASNUYWZAMFSNLZSYLHGDKDWAYKBFYZTECCETEKBPMLODYAEAELAAEAEAELAAEAEAELAAOAEAELAADAEAEAEAEAEAEAEADADFLGMCLAXCSMYGWCMSGFWBTIENEOTRHHDFTVTLYTASNUYWZAMFSNLZSYLHGDKDWAYKBFYZTECCLAXFXPSGMTABNWEIAJTHSCLAOSERKVLJKADWEBKTBBTRKJPTPYKMKLTMSRYRKDYPLLKGMPLAEAEAEWLCMNTPF',
-      'UR:CRYPTO-PSBT/416-4/LPCFADNBAACFAXPLCYZTVYVOPKHDWPONBWDWPACLGTAEIDWLWZBAZODNCSMSEHZELBIYDLMWCSHDIADKNYWNZSSGPKVEFLMKLRKNCELEDAMYEMBYKIJKFNDEDMIAHPLBRDPMLTROWMFNWSLTROCMIOYKWPFZDSLGLGDKWSOYPFAHMODAMYENSAIOSEGAZEEHTSLBKGOEDMWZUTRFNYJEKIPEEMIYJSOTUEZERORFPSGRPABSSKLOGOONAECAGRSFBDLRWFEMLNSALRCWZOWNLPHNPTNSLPJTKBMTEYNSISTAFTEHSEGDOTENSNMHKNFGCLFXOXMYPLCELTKOMTNEGRTOJYGURHKGPMTAFHHKWPKIOTJPGWVSKNSKSSFTOYPTKKSGSRFGIORHMDDAFHNYKTHPCPOTKEGELANNLEWEGMJEKPIYGYSFECJNCWFNRYVLTBTBWPHTKBISTLRLDEMWADCWMNKTTARKDRJSZCJPLRCNFSHGNEGAMTYLVLGOWS',
+      'UR:CRYPTO-PSBT/1-7/LPADATCFAACWCYGUONNTJPHDMSHKAACSJOJKIDJYZMADAEKIAOAEAEAEADRPTPTKQZZCHLWETSSPSPRLEHGYDALGOYBKZECLTNRHADJNGDWEENDISWKPAMHLPRAEAEAEAEAEZMZMZMZMAOLOBWAEAEAEAEAEAECMAEBBKBOTLPWFGMRNINIMPFYNWLGEBAVTVLSWTYPAGEGULOBEAEAEAEAEAEAECPAECXMUJNYTGMWKKOSNSNAHLESWBGKSSOMHCEBZCMNTYKCKJNJNGOCWWTGSYTNBGOZSCFAEAEAEAEAEADAEZCHLADAOAEAEAEAEADADJSBWCLPELPVA',
+      'UR:CRYPTO-PSBT/2-7/LPAOATCFAACWCYGUONNTJPHDMSFEGUSKURLYTOISPKFHURYKOEOYGRGYCNWNADVYTNONDRMNAYLFWYTNHHGAPEAEAEAEAEAEZMZMZMZMADCADSAEAEAEAEAEAECPAECXEEESLTRDCFZSAACWBKLANDTTBEOXBWVYBALFYKRSIESWIYFXFGKSKKIAZEKGNDDIAAAEFDDYFEAOCLAETERHIAPRJTDYLAWMKOONLRSPRNYLCEJTIYUTOTCLRYVOGWKBLSRTIHDYCSHPSEEOAOCXHNKGAHVWISWKKGLUAODAVDKTMDHKHHKNGRPTNLCMIAKPHFHDJNLFEHYNGRGR',
+      'UR:CRYPTO-PSBT/3-7/LPAXATCFAACWCYGUONNTJPHDMSLAGYIDGHTBFHADFLDYFYAOCXESBADSBSLPNEWFGRMKVEFYAEBWJPFPKGRYPYBYHEHNVEGYKEBSGSZMLEFWZMZMPTAOCXGLRHRKDPGDLFBGAXLYZTVTASWFGYKSLSOLRETOVETPDMCAPLHDOLPRENMSONOXSKADINGMCLAOPAKSGTGHBBBTBSFMLFURMDFXJYLTVTHECSWEMHMDKBYNYATTFYSGHLKIPFRTLUNECLAOTTSPGSPRPFWYCNRNMKYKVOKILNUYLEPKVECXDEIHVSWNTTGSGYVLEMUYJELADMNSCLAXWMHDAAOT',
+      'UR:CRYPTO-PSBT/4-7/LPAAATCFAACWCYGUONNTJPHDMSPMPSPFHYIHGAROMWLEESGTCTPAMUKNCSSSMTBWTTOXHHTSMNAEJTNBZCMKDEUEBNGUPLAEAEAEAEADADDNCADSAEAEAEAEAEAECPAECXEEESLTRDCFZSAACWBKLANDTTBEOXBWVYBALFYKRSIESWIYFXFGKSKKIAZEKGNDDICPAOAXHEMTHSKITSMYGYHLYLCSKBBAMKZEKOWFFZSTIDNYDRDTDNYNIHTLTTVADKVADILTFLDYFYAOCXEODYUOJETOIMFDNTGWESLDJSJSHLFLYAFNLTQZTEVORTMNAYRFMETYCTKBGOBG',
+      'UR:CRYPTO-PSBT/5-7/LPAHATCFAACWCYGUONNTJPHDMSCNTAYKSSIOAOCXBWDRWNDYHLESOEEMRPMNLTFMBAESGHKKEEYNVOJZPMBKLDECCWOTDWFNPRSGBBEYADADAHFLGMCLAXHEMTHSKITSMYGYHLYLCSKBBAMKZEKOWFFZSTIDNYDRDTDNYNIHTLTTVADKVADILTCLAXNDBZLDPMFXDMEOPTPSBGJNASSWFLGRDPWZLKEEDSEENLDTSNPKJSEMFZPAPAJKHPGMPLCPAMAXHEMTHSKITSMYGYHLYLCSKBBAMKZEKOWFFZSTIDNYDRDTDNYNIHTLTTVADKVADILTCERPVSHPLSTP',
+      'UR:CRYPTO-PSBT/6-7/LPAMATCFAACWCYGUONNTJPHDMSLEYNVEDYAEAELAAEAEAELAAEAEAELAAOAEAELAAEAEAEAEAOAEAEAECPAMAXNDBZLDPMFXDMEOPTPSBGJNASSWFLGRDPWZLKEEDSEENLDTSNPKJSEMFZPAPAJKHPCETEKBPMLODYAEAELAAEAEAELAAEAEAELAAOAEAELAAEAEAEAEAOAEAEAEAEAEADADFLGMCLAOCKEOCAFLHHOTMWHDECOYVWUEAHWNSAWFAMMOCPGLBDSWPFGYNTSTCADKKPGOVTGRCLAXCSMYGWCMSGFWBTIENEOTRHHDFTVTLYTASNUYLAGSWPTN',
+      'UR:CRYPTO-PSBT/7-7/LPATATCFAACWCYGUONNTJPHDMSWZAMFSNLZSYLHGDKDWAYKBFYZTECGMPLCPAOAOCKEOCAFLHHOTMWHDECOYVWUEAHWNSAWFAMMOCPGLBDSWPFGYNTSTCADKKPGOVTGRCERPLEYNVEDYAEAELAAEAEAELAAEAEAELAAOAEAELAADAEAEAEAEAEAEAECPAOAXCSMYGWCMSGFWBTIENEOTRHHDFTVTLYTASNUYWZAMFSNLZSYLHGDKDWAYKBFYZTECCETEKBPMLODYAEAELAAEAEAELAAEAEAELAAOAEAELAADAEAEAEAEAEAEAEAEAEAEAEAEAEAETOGALYCF',
     ];
 
-    for (const ur of ursSignedByPassport) {
-      await scanText(ur);
-      await waitFor(element(by.id('UrProgressBar'))).toBeVisible();
+    // Keep sync disabled across animated QR cosign screens — re-enabling here
+    // waits on pending layer animations and can hang the suite.
+    try {
+      await scanUrParts(ursSignedByPassport);
+      await waitFor(element(by.id('ItemSigned')))
+        .toBeVisible()
+        .withTimeout(30_000);
+      await waitForId('ProvideSignature');
+      await element(by.id('ProvideSignature')).tap();
+      // Wait for the cosign QR screen to mount before scrolling — with sync off
+      // after UR scans, whileElement(...).scroll can race the navigation.
+      await waitFor(element(by.id('PsbtMultisigQRCodeScrollView')))
+        .toBeVisible()
+        .withTimeout(30_000);
+      await waitFor(element(by.id('CosignedScanOrImportFile')))
+        .toBeVisible()
+        .whileElement(by.id('PsbtMultisigQRCodeScrollView'))
+        .scroll(500, 'down'); // in case emu screen is small and it doesnt fit
+      await tapAndTapAgainIfElementIsNotVisible('CosignedScanOrImportFile', 'ScanQrBackdoorButton');
+
+      const urSignedByPassportAndKeystone = [
+        'UR:CRYPTO-PSBT/1-7/LPADATCFAALNCYDMVDPKEYHDOLHKAALSJOJKIDJYZMADAEKIAOAEAEAEADRPTPTKQZZCHLWETSSPSPRLEHGYDALGOYBKZECLTNRHADJNGDWEENDISWKPAMHLPRAEAEAEAEAEZMZMZMZMAOLOBWAEAEAEAEAEAECMAEBBKBOTLPWFGMRNINIMPFYNWLGEBAVTVLSWTYPAGEGULOBEAEAEAEAEAEAECPAECXMUJNYTGMWKKOSNSNAHLESWBGKSSOMHCEBZCMNTYKCKJNJNGOCWWTGSYTNBGOZSCFAEAEAEAEAEADAEZCHLADAOAEAEAEAEADADJSBWFEGUSKURLYTOISPKFHURYKOEOYGRGYYNPTGWGO',
+        'UR:CRYPTO-PSBT/2-7/LPAOATCFAALNCYDMVDPKEYHDOLCNWNADVYTNONDRMNAYLFWYTNHHGAPEAEAEAEAEAEZMZMZMZMADCADSAEAEAEAEAEAECPAECXEEESLTRDCFZSAACWBKLANDTTBEOXBWVYBALFYKRSIESWIYFXFGKSKKIAZEKGNDDIAAAEFDDYFEAOCLAETERHIAPRJTDYLAWMKOONLRSPRNYLCEJTIYUTOTCLRYVOGWKBLSRTIHDYCSHPSEEOAOCXHNKGAHVWISWKKGLUAODAVDKTMDHKHHKNGRPTNLCMIAKPHFHDJNLFLAGYIDGHTBFHADFLDYFYAOCXESBADSBSLPNEWFGRMKVEFYAEBWJPFPKGRYPYCKBZTLKN',
+        'UR:CRYPTO-PSBT/3-7/LPAXATCFAALNCYDMVDPKEYHDOLBYHEHNVEGYKEBSGSZMLEFWZMZMPTAOCXGLRHRKDPGDLFBGAXLYZTVTASWFGYKSLSOLRETOVETPDMCAPLHDOLPRENMSONOXSKADINGMCLAOPAKSGTGHBBBTBSFMLFURMDFXJYLTVTHECSWEMHMDKBYNYATTFYSGHLKIPFRTLUNECLAOTTSPGSPRPFWYCNRNMKYKVOKILNUYLEPKVECXDEIHVSWNTTGSGYVLEMUYJELADMNSCLAXPMPSPFHYIHGAROMWLEESGTCTPAMUKNCSSSMTBWTTOXHHTSMNAEJTNBZCMKDEUEBNGUPLAEAEAEAEADADDNCADSAEAEJYSBJZSG',
+        'UR:CRYPTO-PSBT/4-7/LPAAATCFAALNCYDMVDPKEYHDOLAEAEAEAECPAECXEEESLTRDCFZSAACWBKLANDTTBEOXBWVYBALFYKRSIESWIYFXFGKSKKIAZEKGNDDICPAOAXHEMTHSKITSMYGYHLYLCSKBBAMKZEKOWFFZSTIDNYDRDTDNYNIHTLTTVADKVADILTFLDYFYAOCXEODYUOJETOIMFDNTGWESLDJSJSHLFLYAFNLTQZTEVORTMNAYRFMETYCNTAYKSSIOAOCXBWDRWNDYHLESOEEMRPMNLTFMBAESGHKKEEYNVOJZPMBKLDECCWOTDWFNPRSGBBEYADCPAOAXNDBZLDPMFXDMEOPTPSBGJNASSWFLGRDPWZNTBEATBG',
+        'UR:CRYPTO-PSBT/5-7/LPAHATCFAALNCYDMVDPKEYHDOLLKEEDSEENLDTSNPKJSEMFZPAPAJKHPFLDYFYAOCXBDGMBDLUENAXDRUEGEBTBAYTTKRNKPTNJSCWBEWERELKMESACPYKWLLRPRMSUTCSAOCXBNGYVEMKMYCNFNFHZOSEUOPELFZSPYKGEOTYLOWZPSOSFDDYJYFYMNLSZOBGBZONADADAHFLGMCLAXHEMTHSKITSMYGYHLYLCSKBBAMKZEKOWFFZSTIDNYDRDTDNYNIHTLTTVADKVADILTCLAXNDBZLDPMFXDMEOPTPSBGJNASSWFLGRDPWZLKEEDSEENLDTSNPKJSEMFZPAPAJKHPGMPLCPAMAXHEMTCSLFVELP',
+        'UR:CRYPTO-PSBT/6-7/LPAMATCFAALNCYDMVDPKEYHDOLHSKITSMYGYHLYLCSKBBAMKZEKOWFFZSTIDNYDRDTDNYNIHTLTTVADKVADILTCERPLEYNVEDYAEAELAAEAEAELAAEAEAELAAOAEAELAAEAEAEAEAOAEAEAECPAMAXNDBZLDPMFXDMEOPTPSBGJNASSWFLGRDPWZLKEEDSEENLDTSNPKJSEMFZPAPAJKHPCETEKBPMLODYAEAELAAEAEAELAAEAEAELAAOAEAELAAEAEAEAEAOAEAEAEAEAEADADFLGMCLAOCKEOCAFLHHOTMWHDECOYVWUEAHWNSAWFAMMOCPGLBDSWPFGYNTSTCADKKPGOVTGRCLAXCSHNNEAHAS',
+        'UR:CRYPTO-PSBT/7-7/LPATATCFAALNCYDMVDPKEYHDOLMYGWCMSGFWBTIENEOTRHHDFTVTLYTASNUYWZAMFSNLZSYLHGDKDWAYKBFYZTECGMPLCPAOAOCKEOCAFLHHOTMWHDECOYVWUEAHWNSAWFAMMOCPGLBDSWPFGYNTSTCADKKPGOVTGRCERPLEYNVEDYAEAELAAEAEAELAAEAEAELAAOAEAELAADAEAEAEAEAEAEAECPAOAXCSMYGWCMSGFWBTIENEOTRHHDFTVTLYTASNUYWZAMFSNLZSYLHGDKDWAYKBFYZTECCETEKBPMLODYAEAELAAEAEAELAAEAEAELAAOAEAELAADAEAEAEAEAEAEAEAEAEAEAEAEBSDARTMS',
+      ];
+
+      await scanUrParts(urSignedByPassportAndKeystone);
+      await waitFor(element(by.id('ExportSignedPsbt')))
+        .toBeVisible()
+        .withTimeout(30_000);
+
+      await element(by.id('PsbtMultisigConfirmButton')).tap();
+    } finally {
+      if (!(await restoreSynchronizationIfAnimatedQrClosed())) {
+        console.warn('[detox] leaving sync disabled after UR cosign: animated QR/scanner still open');
+      }
     }
-
-    await waitFor(element(by.id('ItemSigned'))).toBeVisible(); // one green checkmark visible
-
-    await element(by.id('ProvideSignature')).tap();
-    await waitFor(element(by.id('CosignedScanOrImportFile')))
-      .toBeVisible()
-      .whileElement(by.id('PsbtMultisigQRCodeScrollView'))
-      .scroll(500, 'down'); // in case emu screen is small and it doesnt fit
-    await tapAndTapAgainIfElementIsNotVisible('CosignedScanOrImportFile', 'ScanQrBackdoorButton');
-
-    const urSignedByPassportAndKeystone = [
-      'UR:CRYPTO-PSBT/105-2/LPCSINAOCFAXOLCYSBLUFDHSHKADTEHKAXOTJOJKIDJYZMADAEKIAOAEAEAEADSGMHIEQDIAFLKPVABAJEHLLNVLRKKPCPDAHYNSOTTSOYBTIMMUCYAASSMDAMDAMKAEAEAEAEAEZMZMZMZMAOGDSRAEAEAEAEAEAECMAEBBKBOTLPWFGMRNINIMPFYNWLGEBAVTVLSWTYPAGEGUWFVLAEAEAEAEAEAECPAECXHEJTWTTTWEPDFMMDSNYKDPRYZMRLBARSPAAYLETDCLGDJKIHBNTYFXCHNNWTRHFEAEAEAEAEAEADAEWDAOAEAEAEAEADADSTENIYASISYLVDVLGWCXRPBWVYVSDALOTLCESKTTFEJTWDTBPTECMOMNLNDABSDTADAEAEAEAEADAEAELAAOGDPTADAEAEAEAEAECPAECXCLSWSSWSCPVTGTESFWSBCTCSETNSPYNLBKJLZTUEMWSOMSNNTYGSLSFPNEPKVOIOONMOAOAEAEAEAEAECMAEBBMNAMRTRKDYGUHDURWSVOLGDRRLESMEDLOLGWLYNTAOFLDYFYAOCXDYYTJOMYYAUELEDYKIYLADUROYFNURDRGLFTCYKEKEFEIAOYGSTNCPIDGYZOEEDAAOCXHGCAENYKHNJLGOHEJOGMRLBNTDWYGWJOPFPYFMKKTISROXGMIMGYURAYCXLEUOZSADCLAOJPBGWSASPTIATTPMLECMPRIHSTMDJYLOYKTKRTHHTLSTFZKPOYWKBKROASBGBAVDAEAEAEAEADADDNGDPTADAEAEAEAEAECPAECXCLSWSSWSCPVTGTESFWSBCTCSETNSPYNLBKJLZTUEMWSOMSNNTYGSLSFPNEPKVOIOCPAOAXFTRPWPCPGYBKEHRTTTFDCTNTRHKGFGCXSAHSRHWDMDTONBRLROWMSFCPBTHNTIAAFLDYFYAOCXISRERKHDRDGAPMATEHJLFL',
-      'UR:CRYPTO-PSBT/158-2/LPCSNNAOCFAXOLCYSBLUFDHSHKADTEZECFFTHDETNBADMOCLINLNOSOXZEYKGDPYTPKTRETNURTIZOPDAOCXIAAOWETTJKMDUOSBONAASWNLMERLZSGLCYCTGAKBDAFHGHWKMTRSNLAAYKFWWPRSADADAHFLGMCLAXBAPLDADMGDFLRHLOHGUYHESWEOSKMDMTJLDRTKSSRDFGDWSNTNCHZEVSJTJKDNCNCLAXFTRPWPCPGYBKEHRTTTFDCTNTRHKGFGCXSAHSRHWDMDTONBRLROWMSFCPBTHNTIAAGMPLCPAMAXBAPLDADMGDFLRHLOHGUYHESWEOSKMDMTJLDRTKSSRDFGDWSNTNCHZEVSJTJKDNCNCECMLGTBAXDYAEAELAAEAEAELAAEAEAELAAOAEAELAAEAEAEAEAXAEAEAECPAMAXFTRPWPCPGYBKEHRTTTFDCTNTRHKGFGCXSAHSRHWDMDTONBRLROWMSFCPBTHNTIAACETEKBPMLODYAEAELAAEAEAELAAEAEAELAAOAEAELAAEAEAEAEAXAEAEAEAEAEADADFLGMCLAXCSMYGWCMSGFWBTIENEOTRHHDFTVTLYTASNUYWZAMFSNLZSYLHGDKDWAYKBFYZTECCLAXFXPSGMTABNWEIAJTHSCLAOSERKVLJKADWEBKTBBTRKJPTPYKMKLTMSRYRKDYPLLKGMPLCPAOAXCSMYGWCMSGFWBTIENEOTRHHDFTVTLYTASNUYWZAMFSNLZSYLHGDKDWAYKBFYZTECCETEKBPMLODYAEAELAAEAEAELAAEAEAELAAOAEAELAADAEAEAEAEAEAEAECPAOAXFXPSGMTABNWEIAJTHSCLAOSERKVLJKADWEBKTBBTRKJPTPYKMKLTMSRYRKDYPLLKCECMLGTBAXDYAEAELAAEAEAELAAEAEAELAAOAEAELAADAEAEAEAEAEAEAEAENNHKLKUO',
-    ];
-
-    for (const ur of urSignedByPassportAndKeystone) {
-      await scanText(ur);
-      await waitFor(element(by.id('UrProgressBar'))).toBeVisible();
-    }
-
-    await waitFor(element(by.id('ExportSignedPsbt'))).toBeVisible();
-
-    await element(by.id('PsbtMultisigConfirmButton')).tap();
 
     // created. verifying:
     await waitForId('TransactionValue');
-    await expect(element(by.id('TransactionValue'))).toHaveText('0.0005');
+    await expect(element(by.id('TransactionValue'))).toHaveText('0.00005');
     await element(by.id('TransactionDetailsButton')).tap();
 
     const txhex = await extractTextFromElementById('TxhexInput');
@@ -759,7 +802,7 @@ describe('BlueWallet UI Tests - no wallets', () => {
     assert.ok(transaction.ins.length === 1);
     assert.strictEqual(transaction.outs.length, 2);
     assert.strictEqual(bitcoin.address.fromOutputScript(transaction.outs[0].script), 'bc1q063ctu6jhe5k4v8ka99qac8rcm2tzjjnuktyrl'); // to address
-    assert.strictEqual(transaction.outs[0].value, 50000n);
+    assert.strictEqual(transaction.outs[0].value, 5000n);
 
     process.env.CI && require('fs').writeFileSync(lockFile, '1');
   });
@@ -877,6 +920,128 @@ describe('BlueWallet UI Tests - no wallets', () => {
     process.env.CI && require('fs').writeFileSync(lockFile, '1');
   });
 
+  it('can provide dice entropy, undo rolls, mix it with system RNG and see provided bytes on Add Wallet screen', async () => {
+    const lockFile = '/tmp/travislock.' + hashIt('t_entropy');
+    if (process.env.CI) {
+      if (require('fs').existsSync(lockFile))
+        return console.warn('skipping', JSON.stringify('t_entropy'), 'as it previously passed on Travis');
+    }
+    await device.clearKeychain();
+    await device.launchApp({ delete: true });
+    await waitForId('WalletsList');
+
+    // open Add Wallet screen
+    await waitFor(element(by.id('CreateAWallet')))
+      .toBeVisible()
+      .whileElement(by.id('WalletsList'))
+      .scroll(500, 'right');
+    await element(by.id('CreateAWallet')).tap();
+    await waitForId('WalletNameInput');
+    await element(by.id('WalletNameInput')).replaceText('entropy1');
+    await waitForId('ActivateBitcoinButton');
+    await element(by.id('ActivateBitcoinButton')).tap();
+
+    // header menu -> Provide entropy via dice rolls -> 12 words
+    await element(by.id('HeaderMenuButton')).tap();
+    await element(by.text('Provide entropy via dice rolls')).tap();
+    await element(by.text('12 words')).tap();
+
+    // BIP39: each seed word encodes 11 bits, so two leading "abandon" words require the first 22 bits
+    // of entropy to be zero. We provide 28 zero bits using the zero-value input of every tab: coin
+    // heads = 1 zero bit, d6 "1" = 2 zero bits, d20 "1" = 4 zero bits. 28 is NOT a multiple of 8, so
+    // convertToBuffer trims the surplus 4 bits down to 3 whole bytes — this exercises the excess-bit
+    // trimming path. All bits are zero, so the seed still starts "abandon abandon".
+
+    // d6 tab is active by default; switch to the coin tab
+    await waitForId('Tab0');
+    await element(by.id('Tab0')).tap();
+    await waitForId('CoinFlip0');
+    for (let i = 0; i < 4; i++) {
+      await element(by.id('CoinFlip0')).tap();
+    }
+    assert.ok((await extractTextFromElementById('EntropyCounter')).includes(' 4 of 128 bits'));
+
+    // undo removes the last flip
+    await element(by.id('UndoEntropy')).tap();
+    assert.ok((await extractTextFromElementById('EntropyCounter')).includes(' 3 of 128 bits'));
+    await element(by.id('CoinFlip0')).tap(); // back to 4 zero bits
+
+    // d6 tab: 6 rolls of "1" = 12 more zero bits
+    await element(by.id('Tab1')).tap();
+    await waitForId('Dice6Roll1');
+    for (let i = 0; i < 6; i++) {
+      await element(by.id('Dice6Roll1')).tap();
+    }
+    assert.ok((await extractTextFromElementById('EntropyCounter')).includes('16 of 128 bits'));
+
+    // d20 tab: 2 rolls of "1" = 8 more zero bits -> 24 zero bits total
+    await element(by.id('Tab2')).tap();
+    await waitForId('Dice20Roll1');
+    await element(by.id('Dice20Roll1')).tap();
+    await element(by.id('Dice20Roll1')).tap();
+    assert.ok((await extractTextFromElementById('EntropyCounter')).includes('24 of 128 bits'));
+
+    // one more d20 "1" = 4 more zero bits -> 28 bits total, NOT a multiple of 8
+    await element(by.id('Dice20Roll1')).tap();
+    assert.ok((await extractTextFromElementById('EntropyCounter')).includes('28 of 128 bits'));
+
+    // save: 28 provided bits trim to 3 whole bytes (24 bits); remaining 13 bytes come from the system RNG
+    await element(by.id('SaveEntropy')).tap();
+    await waitFor(
+      element(
+        by.text('24 bits or 3 bytes of generated entropy. Remaining 13 bytes will be obtained from the System random number generator.'),
+      ),
+    )
+      .toExist()
+      .withTimeout(10000);
+    await dismissAlertByText('OK');
+
+    // back on Add Wallet: indicator shows only the trimmed whole-byte count, not the padded total
+    await waitForId('EntropyMixedIndicator');
+    await waitForText('3 bytes of provided entropy will be mixed into your new wallet.');
+
+    // create the wallet; iOS 26 liquid glass sync workaround, same as helperCreateWallet
+    const isIOS = device.getPlatform() === 'ios';
+    if (isIOS) {
+      await device.disableSynchronization();
+    }
+    try {
+      await element(by.id('Create')).tap();
+      try {
+        await waitFor(element(by.id('PleaseBackupScrollView')))
+          .toBeVisible()
+          .withTimeout(15000);
+      } catch (_) {
+        await element(by.id('Create')).tap();
+        await waitFor(element(by.id('PleaseBackupScrollView')))
+          .toBeVisible()
+          .withTimeout(15000);
+      }
+
+      // 24 leading zero bits cover the first 22 bits of the seed entropy -> seed starts with "abandon abandon"
+      const seed = await extractTextFromElementById('Secret');
+      const words = seed.split(' ');
+      assert.strictEqual(words.length, 12);
+      assert.strictEqual(words[0], 'abandon');
+      assert.strictEqual(words[1], 'abandon');
+
+      await waitFor(element(by.id('PleasebackupOk')))
+        .toBeVisible()
+        .whileElement(by.id('PleaseBackupScrollView'))
+        .scroll(500, 'down');
+      await element(by.id('PleasebackupOk')).tap();
+      await waitForId('WalletsList');
+    } finally {
+      if (isIOS) {
+        await device.enableSynchronization();
+      }
+    }
+    await expect(element(by.id('WalletsList'))).toBeVisible();
+
+    await helperDeleteWallet('entropy1');
+    process.env.CI && require('fs').writeFileSync(lockFile, '1');
+  });
+
   it('can create 2of3 multisig vault with generated keys, manage cosigners and export coordination setup; forgetting seed/restoring seed does not change receive address', async () => {
     const lockFile = '/tmp/travislock.' + hashIt('t10');
     if (process.env.CI) {
@@ -924,7 +1089,6 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await tapIfTextPresent('OK');
 
     // navigate into wallet
-    await scrollUpOnHomeScreen();
     await waitForId('Multisig Vault');
     await element(by.id('Multisig Vault')).tap();
     await waitForId('ReceiveButton');
@@ -1004,7 +1168,6 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await waitForId('WalletsList');
 
     // verify receive address remains unchanged after forgetting cosigner 3 seed
-    await scrollUpOnHomeScreen();
     await waitForId('Multisig Vault');
     await element(by.id('Multisig Vault')).tap();
     await waitForId('ReceiveButton');
@@ -1045,7 +1208,6 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await waitForId('WalletsList');
 
     // verify receive address remains unchanged after restoring cosigner 3 seed
-    await scrollUpOnHomeScreen();
     await waitForId('Multisig Vault');
     await element(by.id('Multisig Vault')).tap();
     await waitForId('ReceiveButton');
@@ -1105,7 +1267,6 @@ describe('BlueWallet UI Tests - no wallets', () => {
     await tapIfTextPresent('OK');
 
     // navigate into wallet and verify format
-    await scrollUpOnHomeScreen();
     await waitForId('Multisig Vault');
     await element(by.id('Multisig Vault')).tap();
     await waitForId('ReceiveButton');

@@ -2,6 +2,7 @@ import assert from 'assert';
 
 import * as BlueElectrum from '../../blue_modules/BlueElectrum';
 import { WatchOnlyWallet } from '../../class/wallets/watch-only-wallet';
+import { HDSegwitBech32Transaction } from '../../class/hd-segwit-bech32-transaction';
 
 jest.setTimeout(500 * 1000);
 
@@ -122,6 +123,94 @@ describe('Watch only wallet', () => {
     }
     assert.ok(!used.has(nextAddress), `${nextAddress} has been used already`);
     assert.ok(!used.has(nextChangeAddress), `${nextChangeAddress} has been used already`);
+  });
+
+  // upstream's vector is a Bitcoin transaction, which no Doichain server knows
+  it.skip('can do RBF - bumpfees tx', async () => {
+    const w = new WatchOnlyWallet();
+    w.setSecret('zpub6qLpbJKVYnGb61HgUUuG5jRsrQrJ2uFCuQTX2nyuwPMv8vs8bQbq1T3oLMcbBRp3J8yjHnSnMR7Ykg4ffF82qGjC2TkuKnoAHKPWDJNvYKS');
+    w.init();
+
+    let tt = new HDSegwitBech32Transaction(
+      null,
+      '3f259914c38abf10af40086b196a724b3b9da27095c3d7b627c83335f7d17400',
+      w._hdWalletInstance,
+      4056346968,
+    );
+    let result = await tt.createRBFbumpFee(5);
+
+    // result.tx will be undefined because watch only path that returns psbt will be taken
+    assert.strictEqual(result.tx, undefined);
+
+    assert.ok(result.psbt);
+
+    for (const input of result.psbt.data.inputs) {
+      assert.ok(input.bip32Derivation);
+      assert.strictEqual(input.bip32Derivation.length, 1);
+      assert.deepStrictEqual(Array.from(input.bip32Derivation[0].masterFingerprint), [88, 241, 198, 241]);
+    }
+
+    // without mfp or mfp = 0
+    tt = new HDSegwitBech32Transaction(null, '3f259914c38abf10af40086b196a724b3b9da27095c3d7b627c83335f7d17400', w._hdWalletInstance);
+    result = await tt.createRBFbumpFee(5);
+    assert.strictEqual(result.tx, undefined);
+    assert.ok(result.psbt);
+
+    for (const input of result.psbt.data.inputs) {
+      assert.ok(input.bip32Derivation);
+      assert.strictEqual(input.bip32Derivation.length, 1);
+      assert.deepStrictEqual(Array.from(input.bip32Derivation[0].masterFingerprint), [0, 0, 0, 0]);
+    }
+
+    // should throw if w and not w._hdWalletInstance is passed
+    assert.throws(
+      () => new HDSegwitBech32Transaction(null, '3f259914c38abf10af40086b196a724b3b9da27095c3d7b627c83335f7d17400', w),
+      /Only HD Bech32 wallets supported/,
+    );
+  });
+
+  // upstream's vector is a Bitcoin transaction, which no Doichain server knows
+  it.skip('can do RBF - cancel tx', async () => {
+    const w = new WatchOnlyWallet();
+    w.setSecret('zpub6qLpbJKVYnGb61HgUUuG5jRsrQrJ2uFCuQTX2nyuwPMv8vs8bQbq1T3oLMcbBRp3J8yjHnSnMR7Ykg4ffF82qGjC2TkuKnoAHKPWDJNvYKS');
+    w.init();
+
+    let tt = new HDSegwitBech32Transaction(
+      null,
+      '3f259914c38abf10af40086b196a724b3b9da27095c3d7b627c83335f7d17400',
+      w._hdWalletInstance,
+      4056346968,
+    );
+    let result = await tt.createRBFcancelTx(5);
+
+    // result.tx will be undefined because watch only path that returns psbt will be taken
+    assert.strictEqual(result.tx, undefined);
+
+    assert.ok(result.psbt);
+
+    for (const input of result.psbt.data.inputs) {
+      assert.ok(input.bip32Derivation);
+      assert.strictEqual(input.bip32Derivation.length, 1);
+      assert.deepStrictEqual(Array.from(input.bip32Derivation[0].masterFingerprint), [88, 241, 198, 241]);
+    }
+
+    // without mfp or mfp = 0
+    tt = new HDSegwitBech32Transaction(null, '3f259914c38abf10af40086b196a724b3b9da27095c3d7b627c83335f7d17400', w._hdWalletInstance);
+    result = await tt.createRBFcancelTx(5);
+    assert.strictEqual(result.tx, undefined);
+    assert.ok(result.psbt);
+
+    for (const input of result.psbt.data.inputs) {
+      assert.ok(input.bip32Derivation);
+      assert.strictEqual(input.bip32Derivation.length, 1);
+      assert.deepStrictEqual(Array.from(input.bip32Derivation[0].masterFingerprint), [0, 0, 0, 0]);
+    }
+
+    // should throw if w and not w._hdWalletInstance is passed
+    assert.throws(
+      () => new HDSegwitBech32Transaction(null, '3f259914c38abf10af40086b196a724b3b9da27095c3d7b627c83335f7d17400', w),
+      /Only HD Bech32 wallets supported/,
+    );
   });
 
   // skipped because its generally rare case
