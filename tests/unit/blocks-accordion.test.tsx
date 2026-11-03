@@ -37,6 +37,10 @@ jest.mock('../../loc', () => ({
       blocks_confirmed_summary: 'Included in block {blockHeight}.',
       blocks_confirmed_fee_summary: 'With a size of {vsize} and a fee rate of {feeRate}, paying {fee} fee.',
     },
+    units: {
+      sats: 'swartz',
+      sat_byte: 'swartz/byte',
+    },
   },
   formatBalanceWithoutSuffix: (value: number | string) => String(value),
 }));
@@ -92,8 +96,8 @@ describe('BlocksAccordion', () => {
       expect(getAllByText('800000').length).toBeGreaterThan(0);
       expect(getByText(/With a size of/)).toBeTruthy();
       expect(getByText('140 vb')).toBeTruthy();
-      expect(getByText('7.1 sats/vb')).toBeTruthy();
-      expect(getByText('1000 sats')).toBeTruthy();
+      expect(getByText('7.1 swartz/byte')).toBeTruthy();
+      expect(getByText('1000 swartz')).toBeTruthy();
     });
   });
 
