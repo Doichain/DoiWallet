@@ -1,25 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
+import { useNavigation, RouteProp, useFocusEffect, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Avatar from '../../components/Avatar';
 import Badge from '../../components/Badge';
 import Icon from '../../components/Icon';
-import { Animated, ActivityIndicator, Keyboard, PixelRatio, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, ActivityIndicator, Easing, PixelRatio, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import debounce from '../../blue_modules/debounce';
+import triggerHapticFeedback, { HapticFeedbackTypes } from '../../blue_modules/hapticFeedback';
 import { TWallet, Utxo } from '../../class/wallets/types';
 import { FButton, FContainer } from '../../components/FloatButtons';
-import HeaderMenuButton from '../../components/HeaderMenuButton';
-import SafeArea from '../../components/SafeArea';
 import SafeAreaScrollView from '../../components/SafeAreaScrollView';
 import { useTheme } from '../../components/themes';
-import { Action } from '../../components/types';
 import { useStorage } from '../../hooks/context/useStorage';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import loc, { formatBalance } from '../../loc';
 import { DoichainUnit } from '../../models/doichainUnits';
 import { goFromCoinControlToSendDetails } from '../../navigation/goFromCoinControlToSendDetails';
-import { SendDetailsStackParamList } from '../../navigation/SendDetailsStackParamList';
-import { CommonToolTipActions } from '../../typings/CommonToolTipActions';
+import { CoinControlSortDirection, CoinControlSortType, SendDetailsStackParamList } from '../../navigation/SendDetailsStackParamList';
 
 type NavigationProps = NativeStackNavigationProp<SendDetailsStackParamList, 'CoinControl'>;
 type RouteProps = RouteProp<SendDetailsStackParamList, 'CoinControl'>;
@@ -112,11 +108,35 @@ const OutputList: React.FC<TOutputListProps> = ({
   const memo = oMemo || txMetadata[txid]?.memo || '';
   const color = `#${txid.substring(0, 6)}`;
   const amount = formatBalance(value, balanceUnit, true);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   let onPress = onOpen;
   if (selectionStarted) {
     onPress = selected ? onDeSelect : onSelect;
   }
+
+  const animateTo = useCallback(
+    (toValue: number) => {
+      Animated.timing(scaleAnim, {
+        toValue,
+        duration: 120,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    },
+    [scaleAnim],
+  );
+
+  const handlePress = useCallback(() => {
+    triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
+    onPress();
+  }, [onPress]);
+
+  const handleAvatarPress = useCallback(() => {
+    triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
+    if (selected) onDeSelect();
+    else onSelect();
+  }, [onDeSelect, onSelect, selected]);
 
   const oStyles = StyleSheet.create({
     container: { borderBottomColor: colors.lightBorder, backgroundColor: 'transparent' },
@@ -128,48 +148,41 @@ const OutputList: React.FC<TOutputListProps> = ({
   });
 
   return (
-    <Pressable onPress={onPress} style={[styles.listRow, selected ? oStyles.containerSelected : oStyles.container]}>
-      <Avatar
-        rounded
-        size={40}
-        containerStyle={selected ? oStyles.avatarSelected : oStyles.avatar}
-        onPress={selected ? onDeSelect : onSelect}
-        icon={selected ? { name: 'check', type: 'font-awesome-6', color: 'white', size: 18 } : undefined}
-      />
-      <View style={styles.itemContent}>
-        <Text style={oStyles.amount}>{amount}</Text>
-        <Text testID="OutputMemoLabel" style={oStyles.memo} numberOfLines={1} ellipsizeMode="middle">
-          {memo || address}
-        </Text>
-      </View>
-      <View style={styles.badges}>
-        {frozen && <FrozenBadge />}
-        {change && <ChangeBadge />}
-      </View>
+    <Pressable onPress={handlePress} onPressIn={() => animateTo(0.97)} onPressOut={() => animateTo(1)}>
+      <Animated.View style={[styles.listRow, selected ? oStyles.containerSelected : oStyles.container, { transform: [{ scale: scaleAnim }] }]}>
+        <Avatar
+          rounded
+          size={40}
+          containerStyle={selected ? oStyles.avatarSelected : oStyles.avatar}
+          onPress={handleAvatarPress}
+          onPressIn={() => animateTo(0.97)}
+          onPressOut={() => animateTo(1)}
+          icon={selected ? { name: 'check', type: 'font-awesome-6', color: 'white', size: 18 } : undefined}
+        />
+        <View style={styles.itemContent}>
+          <Text style={oStyles.amount}>{amount}</Text>
+          <Text testID="OutputMemoLabel" style={oStyles.memo} numberOfLines={1} ellipsizeMode="middle">
+            {memo || address}
+          </Text>
+        </View>
+        <View style={styles.badges}>
+          {frozen && <FrozenBadge />}
+          {change && <ChangeBadge />}
+        </View>
+      </Animated.View>
     </Pressable>
   );
 };
 
-enum ESortDirections {
-  asc = 'asc',
-  desc = 'desc',
-}
-
-enum ESortTypes {
-  height = 'height',
-  label = 'label',
-  value = 'value',
-  frozen = 'frozen',
-}
-
 const CoinControl: React.FC = () => {
   const { colors } = useTheme();
-  const navigation = useExtendedNavigation<NavigationProps>();
+  const navigation = useNavigation<NavigationProps>();
   const { width } = useWindowDimensions();
-  const { walletID } = useRoute<RouteProps>().params;
+  const route = useRoute<RouteProps>();
+  const { walletID } = route.params;
   const { wallets, saveToDisk, sleep } = useStorage();
-  const [sortDirection, setSortDirection] = useState<ESortDirections>(ESortDirections.asc);
-  const [sortType, setSortType] = useState<ESortTypes>(ESortTypes.height);
+  const sortDirection = route.params?.sortDirection ?? CoinControlSortDirection.ASC;
+  const sortType = route.params?.sortType ?? CoinControlSortType.HEIGHT;
   const wallet = useMemo(() => wallets.find(w => w.getID() === walletID) as TWallet, [walletID, wallets]);
   const [frozen, setFrozen] = useState<string[]>(
     wallet
@@ -180,16 +193,16 @@ const CoinControl: React.FC = () => {
   const utxos: Utxo[] = useMemo(() => {
     const res = wallet.getUtxo(true).sort((a, b) => {
       switch (sortType) {
-        case ESortTypes.height:
+        case CoinControlSortType.HEIGHT:
           return a.height - b.height || a.txid.localeCompare(b.txid) || a.vout - b.vout;
-        case ESortTypes.value:
+        case CoinControlSortType.VALUE:
           return a.value - b.value || a.txid.localeCompare(b.txid) || a.vout - b.vout;
-        case ESortTypes.label: {
+        case CoinControlSortType.LABEL: {
           const aMemo = wallet.getUTXOMetadata(a.txid, a.vout).memo || '';
           const bMemo = wallet.getUTXOMetadata(b.txid, b.vout).memo || '';
           return aMemo.localeCompare(bMemo) || a.txid.localeCompare(b.txid) || a.vout - b.vout;
         }
-        case ESortTypes.frozen: {
+        case CoinControlSortType.FROZEN: {
           const aF = frozen.includes(`${a.txid}:${a.vout}`);
           const bF = frozen.includes(`${b.txid}:${b.vout}`);
           return aF !== bF ? (aF ? -1 : 1) : a.txid.localeCompare(b.txid) || a.vout - b.vout;
@@ -199,7 +212,7 @@ const CoinControl: React.FC = () => {
       }
     });
     // invert if descending
-    return sortDirection === ESortDirections.desc ? res.reverse() : res;
+    return sortDirection === CoinControlSortDirection.DESC ? res.reverse() : res;
   }, [sortDirection, sortType, wallet, frozen]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selected, setSelected] = useState<string[]>([]);
@@ -243,6 +256,18 @@ const CoinControl: React.FC = () => {
       setSelected([]);
     }, [wallet]),
   );
+
+  useEffect(() => {
+    const hasUtxos = utxos.length > 0;
+    const nextParams: Partial<SendDetailsStackParamList['CoinControl']> = {};
+    if (route.params?.hasUtxos !== hasUtxos) {
+      nextParams.hasUtxos = hasUtxos;
+    }
+
+    if (Object.keys(nextParams).length > 0) {
+      navigation.setParams(nextParams);
+    }
+  }, [navigation, route.params?.hasUtxos, utxos.length]);
 
   const tipText = useMemo(() => {
     if (utxos.length === 0) return '';
@@ -310,65 +335,22 @@ const CoinControl: React.FC = () => {
     );
   };
 
-  const toolTipActions = useMemo((): Action[] | Action[][] => {
-    return [
-      [sortDirection === ESortDirections.asc ? CommonToolTipActions.SortASC : CommonToolTipActions.SortDESC],
-      [
-        { ...CommonToolTipActions.SortHeight, menuState: sortType === ESortTypes.height },
-        { ...CommonToolTipActions.SortValue, menuState: sortType === ESortTypes.value },
-        { ...CommonToolTipActions.SortLabel, menuState: sortType === ESortTypes.label },
-        { ...CommonToolTipActions.SortStatus, menuState: sortType === ESortTypes.frozen },
-      ],
-    ];
-  }, [sortDirection, sortType]);
-
-  const toolTipOnPressMenuItem = useCallback((menuItem: string) => {
-    Keyboard.dismiss();
-    if (menuItem === CommonToolTipActions.SortASC.id) {
-      setSortDirection(ESortDirections.desc);
-    } else if (menuItem === CommonToolTipActions.SortDESC.id) {
-      setSortDirection(ESortDirections.asc);
-    } else if (menuItem === CommonToolTipActions.SortHeight.id) {
-      setSortType(ESortTypes.height);
-    } else if (menuItem === CommonToolTipActions.SortValue.id) {
-      setSortType(ESortTypes.value);
-    } else if (menuItem === CommonToolTipActions.SortLabel.id) {
-      setSortType(ESortTypes.label);
-    } else if (menuItem === CommonToolTipActions.SortStatus.id) {
-      setSortType(ESortTypes.frozen);
-    }
-  }, []);
-
-  const HeaderRight = useMemo(
-    () => <HeaderMenuButton onPressMenuItem={toolTipOnPressMenuItem} actions={toolTipActions} title={loc.cc.sort_by} />,
-    [toolTipOnPressMenuItem, toolTipActions],
-  );
-
-  // Adding the ToolTipMenu to the header
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (utxos.length > 0 ? HeaderRight : null),
-    });
-  }, [HeaderRight, navigation, utxos.length]);
-
-  if (loading) {
-    return (
-      <SafeArea style={[styles.center, { backgroundColor: colors.elevated }]}>
-        <ActivityIndicator testID="Loading" />
-      </SafeArea>
-    );
-  }
-
   return (
-    <View style={[styles.root, { backgroundColor: colors.elevated }]}>
-      {utxos.length === 0 && (
-        <View style={styles.empty}>
-          <Text style={{ color: colors.foregroundColor }}>{loc.cc.empty}</Text>
-        </View>
-      )}
-      <SafeAreaScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.listContent}>
-        {tipCoins()}
-        {utxos.map(renderItem)}
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <SafeAreaScrollView
+        contentInsetAdjustmentBehavior="never"
+        disableDefaultTopPadding
+        contentContainerStyle={loading ? styles.loadingContent : styles.listContent}
+      >
+        {loading ? (
+          <ActivityIndicator testID="Loading" />
+        ) : (
+          <>
+            {utxos.length === 0 && <Text style={[styles.emptyText, { color: colors.foregroundColor }]}>{loc.cc.empty}</Text>}
+            {tipCoins()}
+            {utxos.map(renderItem)}
+          </>
+        )}
       </SafeAreaScrollView>
 
       {selectionStarted && (
@@ -397,14 +379,13 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
-  center: {
+  loadingContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  empty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  emptyText: {
+    textAlign: 'center',
     padding: 24,
   },
   sendIcon: {
@@ -414,6 +395,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   listRow: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,

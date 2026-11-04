@@ -38,10 +38,6 @@ export class TaprootWallet extends SegwitBech32Wallet {
     return true;
   }
 
-  allowSendMax() {
-    return true;
-  }
-
   isSegwit() {
     return true;
   }

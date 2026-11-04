@@ -7,41 +7,15 @@ When upstream ships an equivalent fix, drop the patch here and bump the dependen
 
 ---
 
-## `react-native-tcp-socket+6.4.1.patch`
+## `react-native-background-fetch+4.4.2.patch`
 
-**What:** in `TcpSockets.m onConnect:`, read the socket addresses once and
-emit `connect` only when both are valid; otherwise emit an `error` event
-for that client.
+Uses the package's bundled `TSBackgroundFetch.xcframework`, which includes
+Mac Catalyst, instead of the standalone `TSBackgroundFetch` 4.1.x pod, which
+only includes iOS device and simulator binaries. Without this patch, Catalyst
+builds fail to import `TSBackgroundFetch/TSBackgroundFetch.h`.
 
-**Why:** `onConnect:` builds an `NSDictionary` literal from
-`[socket localHost]` / `[socket connectedHost]`. The socket can disconnect
-between this callback being queued and run, in which case those getters
-return `nil`; a dictionary literal with a `nil` value throws
-`NSInvalidArgumentException`, which is uncaught and aborts the whole app
-(SIGABRT). It is intermittent and was seen against Electrum TLS
-connections, but is not TLS-specific.
-
-```
-NSInvalidArgumentException — attempt to insert nil object from objects[0]
-  -[TcpSockets onConnect:]  ->  -[TcpSocketClient socketDidSecure:]
-→ Signal 6 (abort)
-```
-
-The `error`-event path (rather than just skipping the event) is
-deliberate: skipping silently leaves the JS side waiting forever for a
-`connect` callback that never arrives. Emitting `error` lets the JS
-connection fail fast so the caller can retry.
-
-**Upstream:**
-- Bug: https://github.com/Rapsssito/react-native-tcp-socket/issues/197 (open)
-- https://github.com/Rapsssito/react-native-tcp-socket/pull/225 (open) —
-  proposes the same nil guard but skips the event, which the maintainer
-  noted would hang JS; this patch emits `error` instead.
-- https://github.com/Rapsssito/react-native-tcp-socket/pull/172 (closed) —
-  earlier attempt with the same error-event structure.
-
-**Remove this patch once an upstream fix is merged and
-`react-native-tcp-socket` is bumped past 6.4.1.**
+Remove when the upstream pod dependency includes a Catalyst slice. When
+upgrading, verify the bundled framework still supports all three destinations.
 
 ---
 
@@ -64,3 +38,66 @@ delivered.
 Added in BlueWallet PR https://github.com/BlueWallet/BlueWallet/pull/8424
 during a React Native bump. Remove once `react-native-notifications`
 ships New-Architecture-safe token delivery.
+
+---
+
+## `react-native-context-menu-view+1.21.0.patch`
+
+**What:** Android-only changes to `ContextMenuView.java`:
+
+- in `dropdownMenuMode`, a single tap opens a `PopupMenu` (new
+  `showDropdownMenu()`) instead of the floating `ContextMenu`. The popup is
+  anchored to the view rather than to the touch point, the old
+  `SDK_INT >= N` guard is gone, icons are shown via `setMenuIconDisplay()`
+  plus `setForceShowIcon(true)` on Android Q+, and `onCancel` is still
+  emitted on dismiss;
+- menu building is shared through a new `populateMenu()`; both it and
+  `showDropdownMenu()` return early when `actions` is null;
+- actions with a `selected` key are rendered as checkable items
+  (`setCheckable` / `setChecked`);
+- `onPress` always includes `indexPath` (`[i]` for top-level items,
+  `[parentIndex, i]` for submenu items) instead of only for submenus;
+- `icon` is read only when the key is present (`action.hasKey("icon")`).
+  Defensive only: `getString` already returns null for a missing key and
+  `getResourceWithName` tolerates null.
+
+**Why:** the floating `ContextMenu` does not draw checkable/`selected`
+items, so toggle entries (e.g. the passphrase switch in the Add Wallet
+header menu) showed no state on Android. `components/TooltipMenu.tsx`
+resolves the pressed action by `indexPath` (two actions may share the same
+title); it already falls back to `[index]` when `indexPath` is missing, so
+always sending it only makes Android consistent with iOS and submenus.
+
+**Upstream:** no issue filed yet. The dependency is installed from the
+BlueWallet fork (`github:BlueWallet/react-native-context-menu-view`, see
+`package.json`), so these changes can be committed to the fork instead —
+then drop this patch and bump the pinned commit.
+
+Added in BlueWallet PR https://github.com/BlueWallet/BlueWallet/pull/8867.
+When bumping `react-native-context-menu-view`, rename this patch to the new
+version and re-confirm the hunks still apply (`npx patch-package`).
+
+---
+
+## `react-native-screens+4.27.0.patch`
+
+**What:** two hunks in `RNSBarButtonItem.mm`:
+
+- `initWithConfig:` also sets `self.accessibilityIdentifier` when the JS
+  `identifier` is provided (one line, alongside the existing
+  `self.identifier = identifier`);
+- `createActionItemFromConfig:` reads `dict[@"identifier"]` and passes it to
+  `[UIAction actionWithTitle:image:identifier:handler:]` instead of `nil`, so
+  menu actions carry their JS `identifier` too.
+
+**Why:** the iOS 26 glass header builds nav-bar buttons through
+`unstable_headerRightItems`. The native `identifier` is not exposed as an
+accessibility identifier, so Detox/XCUITest could not target those bar
+buttons. Mirroring it onto `accessibilityIdentifier` makes them reachable
+from e2e tests.
+
+**Upstream:** no issue filed yet — local accessibility enhancement.
+
+Added in BlueWallet PR https://github.com/BlueWallet/BlueWallet/pull/8508.
+When bumping `react-native-screens`, rename this patch to the new version
+and re-confirm the hunks still apply (`npx patch-package`).

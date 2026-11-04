@@ -1,22 +1,43 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import React, { lazy } from 'react';
-import { Platform } from 'react-native';
+import { Image, Keyboard, Platform, StyleSheet, TouchableOpacity } from 'react-native';
 
-import navigationStyle, { CloseButtonPosition } from '../components/navigationStyle';
+import { createEllipsisHeaderMenuOptions } from '../components/headerMenuOptions';
+import { Action } from '../components/types';
+import navigationStyle, { CloseButtonPosition, withRouteParamHeaderOptions } from '../components/navigationStyle';
+import { isIOS26OrHigher } from '../blue_modules/environment';
 import { useTheme } from '../components/themes';
+import { HDSegwitBech32Wallet } from '../class/wallets/hd-segwit-bech32-wallet';
+import { HDSegwitP2SHWallet } from '../class/wallets/hd-segwit-p2sh-wallet';
+import { SegwitP2SHWallet } from '../class/wallets/segwit-p2sh-wallet';
 import loc from '../loc';
+import { Chain } from '../models/doichainUnits';
+import { CommonToolTipActions } from '../typings/CommonToolTipActions';
 import { withLazySuspense } from './LazyLoadingIndicator';
 import { ScanQRCodeParamList } from './DetailViewStackParamList';
+import { navigationGuardRouter } from './navigationGuard';
+
+type HeaderRightRenderer = NonNullable<NativeStackNavigationOptions['headerRight']>;
 
 export type AddWalletStackParamList = {
   AddWallet: {
     entropy?: string;
+    providedEntropyBytes?: number;
     words?: number;
+    selectedIndex?: number;
+    selectedWalletType?: Chain | 'VAULT' | 'ARK';
+    headerRight?: HeaderRightRenderer;
+    statusBarStyle?: NativeStackNavigationOptions['statusBarStyle'];
   };
   ImportWallet?: {
     label?: string;
     triggerImport?: boolean;
     onBarScanned?: string;
+    askPassphraseMenuState?: boolean;
+    searchAccountsMenuState?: boolean;
+    clearClipboardMenuState?: boolean;
+    headerRight?: HeaderRightRenderer;
   };
   ImportWalletDiscovery: {
     importText: string;
@@ -46,6 +67,7 @@ export type AddWalletStackParamList = {
     n: number;
     format: string;
     onSave: (m: number, n: number, format: string) => void;
+    headerRight?: HeaderRightRenderer;
   };
   WalletsAddMultisigStep2: {
     m: number;
@@ -56,6 +78,7 @@ export type AddWalletStackParamList = {
     sheetAction?: string;
     sheetImportText?: string;
     sheetAskPassphrase?: boolean;
+    headerRight?: HeaderRightRenderer;
   };
   WalletsAddMultisigVaultKeySheet: {
     keyIndex: number;
@@ -111,28 +134,165 @@ const WalletsAddMultisigCosignerXpubSheetComponent = withLazySuspense(WalletsAdd
 const ScanQRCodeComponent = withLazySuspense(ScanQRCode);
 const multisigSheetAllowedDetents = Platform.OS === 'ios' ? 'fitToContents' : [0.9];
 
+const styles = StyleSheet.create({
+  closeButton: {
+    padding: 10,
+  },
+});
+
+// The same three types as screen/wallets/Add.tsx. Upstream offers HD legacy, HD taproot and Lightning
+// here; taproot is never activated on Doichain mainnet and this fork has no Lightning wallet.
+const addWalletTypes = [
+  {
+    id: HDSegwitBech32Wallet.type,
+    text: `${loc.multisig.native_segwit_title}`,
+    subtitle: 'p2wsh/HD',
+  },
+  {
+    id: SegwitP2SHWallet.type,
+    text: `${loc.multisig.wrapped_segwit_title}`,
+    subtitle: 'p2sh-p2wsh/HD',
+  },
+  {
+    id: HDSegwitP2SHWallet.type,
+    text: `${loc.multisig.legacy_title}`,
+    subtitle: 'p2sh/non-HD',
+  },
+];
+
+const createAddWalletOptions = (theme: ReturnType<typeof useTheme>) =>
+  navigationStyle({ closeButtonPosition: CloseButtonPosition.Left, title: loc.wallets.add_title }, (options, { navigation, route }) => {
+    const selectedIndex = route.params?.selectedIndex ?? 0;
+    const selectedWalletType = route.params?.selectedWalletType ?? Chain.ONCHAIN;
+    const words = route.params?.words;
+    const entropyHex = route.params?.entropy;
+    const hasEntropy = !!entropyHex;
+    const providedEntropyBytes = route.params?.providedEntropyBytes || (entropyHex ? Math.floor(entropyHex.length / 2) : 0);
+
+    const entropyButtonText = hasEntropy
+      ? loc.formatString(loc.wallets.add_entropy_bytes, {
+          bytes: providedEntropyBytes,
+        })
+      : loc.wallets.add_entropy_provide;
+
+    const onPressMenuItem = (id: string) => {
+      if (id === '12_words') {
+        navigation.navigate('ProvideEntropy', { words: 12, entropy: entropyHex });
+      } else if (id === '24_words') {
+        navigation.navigate('ProvideEntropy', { words: 24, entropy: entropyHex });
+      } else if (id === CommonToolTipActions.ResetToDefault.id) {
+        navigation.setParams({ entropy: undefined, providedEntropyBytes: undefined, words: undefined, selectedWalletType: Chain.ONCHAIN });
+      } else {
+        const nextIndex = addWalletTypes.findIndex(item => item.id === id);
+        if (nextIndex >= 0) {
+          navigation.setParams({ selectedIndex: nextIndex, selectedWalletType: Chain.ONCHAIN });
+        }
+      }
+    };
+
+    const actions: Action[] = [
+      {
+        id: 'wallets',
+        text: loc.multisig.wallet_type,
+        displayInline: true,
+        subactions: addWalletTypes.map((walletType, index) => ({
+          id: walletType.id,
+          text: walletType.text,
+          subtitle: walletType.subtitle,
+          menuState: index === selectedIndex && selectedWalletType === Chain.ONCHAIN,
+        })),
+      },
+    ];
+
+    if (selectedWalletType === Chain.ONCHAIN) {
+      actions.push({
+        id: CommonToolTipActions.Entropy.id,
+        text: entropyButtonText,
+        subactions: [
+          {
+            id: '12_words',
+            text: loc.wallets.add_wallet_seed_length_12,
+            subtitle: loc.wallets.add_wallet_seed_length,
+            menuState: words === 12,
+          },
+          {
+            id: '24_words',
+            text: loc.wallets.add_wallet_seed_length_24,
+            subtitle: loc.wallets.add_wallet_seed_length,
+            menuState: words === 24,
+          },
+          { ...CommonToolTipActions.ResetToDefault, hidden: !hasEntropy },
+        ],
+      });
+    }
+
+    const headerMenuOptions = createEllipsisHeaderMenuOptions({ actions, onPressMenuItem, title: '' });
+
+    return {
+      ...options,
+      headerRight: headerMenuOptions.headerRight,
+      ...(isIOS26OrHigher ? { unstable_headerRightItems: headerMenuOptions.unstable_headerRightItems } : {}),
+    };
+  })(theme);
+
+export const createImportWalletOptions = (theme: ReturnType<typeof useTheme>) =>
+  navigationStyle({ title: loc.wallets.import_title }, (options, { navigation, route }) => {
+    const askPassphraseMenuState = route.params?.askPassphraseMenuState ?? false;
+    const searchAccountsMenuState = route.params?.searchAccountsMenuState ?? false;
+    const clearClipboardMenuState = route.params?.clearClipboardMenuState ?? true;
+
+    const onPressMenuItem = (menuItem: string) => {
+      Keyboard.dismiss();
+      if (menuItem === CommonToolTipActions.Passphrase.id) {
+        navigation.setParams({ askPassphraseMenuState: !askPassphraseMenuState });
+      } else if (menuItem === CommonToolTipActions.SearchAccount.id) {
+        navigation.setParams({ searchAccountsMenuState: !searchAccountsMenuState });
+      } else if (menuItem === CommonToolTipActions.ClearClipboard.id) {
+        navigation.setParams({ clearClipboardMenuState: !clearClipboardMenuState });
+      }
+    };
+
+    const actions: Action[] = [
+      { ...CommonToolTipActions.Passphrase, menuState: askPassphraseMenuState },
+      { ...CommonToolTipActions.SearchAccount, menuState: searchAccountsMenuState },
+      { ...CommonToolTipActions.ClearClipboard, menuState: clearClipboardMenuState },
+    ];
+
+    const headerMenuOptions = createEllipsisHeaderMenuOptions({ actions, onPressMenuItem });
+
+    return {
+      ...options,
+      headerRight: headerMenuOptions.headerRight,
+      ...(isIOS26OrHigher ? { unstable_headerRightItems: headerMenuOptions.unstable_headerRightItems } : {}),
+      headerLeft:
+        navigation.getState().index === 0
+          ? () =>
+              React.createElement(
+                TouchableOpacity,
+                {
+                  accessibilityRole: 'button',
+                  accessibilityLabel: loc._.close,
+                  style: styles.closeButton,
+                  onPress: () => navigation.goBack(),
+                  testID: 'NavigationCloseButton',
+                },
+                React.createElement(Image, { source: theme.closeImage }),
+              )
+          : options.headerLeft,
+    };
+  })(theme);
+
 const AddWalletStack = () => {
   const theme = useTheme();
   return (
-    <Stack.Navigator initialRouteName="AddWallet">
-      <Stack.Screen
-        name="AddWallet"
-        component={AddComponent}
-        options={navigationStyle({
-          headerBackVisible: false,
-          title: loc.wallets.add_title,
-        })(theme)}
-      />
+    <Stack.Navigator initialRouteName="AddWallet" UNSTABLE_router={navigationGuardRouter}>
+      <Stack.Screen name="AddWallet" component={AddComponent} options={createAddWalletOptions(theme)} />
       <Stack.Screen
         name="ImportCustomDerivationPath"
         component={ImportCustomDerivationPathComponent}
         options={navigationStyle({ statusBarStyle: 'light', title: loc.wallets.import_derivation_title })(theme)}
       />
-      <Stack.Screen
-        name="ImportWallet"
-        component={ImportWalletComponent}
-        options={navigationStyle({ title: loc.wallets.import_title })(theme)}
-      />
+      <Stack.Screen name="ImportWallet" component={ImportWalletComponent} options={createImportWalletOptions(theme)} />
       <Stack.Screen
         name="ImportSpeed"
         component={ImportSpeedComponent}
@@ -173,19 +333,22 @@ const AddWalletStack = () => {
       <Stack.Screen
         name="MultisigAdvanced"
         component={MultisigAdvancedComponent}
-        options={navigationStyle({
-          title: loc.multisig.vault_advanced_customize,
-          presentation: 'formSheet',
-          sheetAllowedDetents: multisigSheetAllowedDetents,
-          sheetGrabberVisible: true,
-          headerShown: true,
-          headerTitle: loc.multisig.vault_advanced_customize,
-        })(theme)}
+        options={navigationStyle(
+          {
+            title: loc.multisig.vault_advanced_customize,
+            presentation: 'formSheet',
+            sheetAllowedDetents: multisigSheetAllowedDetents,
+            sheetGrabberVisible: true,
+            headerShown: true,
+            headerTitle: loc.multisig.vault_advanced_customize,
+          },
+          withRouteParamHeaderOptions({ headerRight: true }),
+        )(theme)}
       />
       <Stack.Screen
         name="WalletsAddMultisigStep2"
         component={WalletsAddMultisigStep2Component}
-        options={navigationStyle({ title: '', gestureEnabled: false })(theme)}
+        options={navigationStyle({ title: '', gestureEnabled: false }, withRouteParamHeaderOptions({ headerRight: true }))(theme)}
       />
       <Stack.Screen
         name="WalletsAddMultisigVaultKeySheet"

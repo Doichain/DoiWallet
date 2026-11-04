@@ -85,6 +85,20 @@
 				<string>io.bluewallet.bwcosigner</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeIconFiles</key>
+			<array/>
+			<key>CFBundleTypeName</key>
+			<string>BIP-329 Wallet Labels</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>io.bluewallet.bip329</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
@@ -213,6 +227,23 @@
 	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -240,8 +271,6 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
-	<true/>
-	<key>UIDesignRequiresCompatibility</key>
 	<true/>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
@@ -309,6 +338,28 @@
 				</array>
 			</dict>
 		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+				<string>public.text</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>BIP-329 Wallet Labels</string>
+			<key>UTTypeIdentifier</key>
+			<string>io.bluewallet.bip329</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>jsonl</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/x-ndjson</string>
+				</array>
+			</dict>
+		</dict>
 	</array>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
@@ -336,8 +387,6 @@
 			</dict>
 		</dict>
 	</array>
-	<key>WKCompanionAppBundleIdentifier</key>
-	<string>io.bluewallet.bluewallet</string>
 	<key>bugsnag</key>
 	<dict>
 		<key>apiKey</key>

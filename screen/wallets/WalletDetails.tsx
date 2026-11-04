@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { writeFileAndExport } from '../../blue_modules/fs';
+import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  applyWalletHistoryNoteUpdates,
+  encodeBip329TransactionLabel,
+  encodeCsvRow,
+  parseWalletHistoryNotes,
+  planWalletHistoryNoteImport,
+  selectWalletHistoryNoteUpdates,
+  showFilePickerAndReadFile,
+  writeFileAndExport,
+} from '../../blue_modules/fs';
 import triggerHapticFeedback, { HapticFeedbackTypes } from '../../blue_modules/hapticFeedback';
 import { uint8ArrayToHex } from '../../blue_modules/uint8array-extras';
 import BlueCard from '../../components/BlueCard';
@@ -12,18 +21,19 @@ import { MultisigHDWallet } from '../../class/wallets/multisig-hd-wallet';
 import { SegwitBech32Wallet } from '../../class/wallets/segwit-bech32-wallet';
 import { SegwitP2SHWallet } from '../../class/wallets/segwit-p2sh-wallet';
 import { WatchOnlyWallet } from '../../class/wallets/watch-only-wallet';
+import { normalizeDerivationPath, validateBip32 } from '../../class/wallet-import';
 import { AbstractHDElectrumWallet } from '../../class/wallets/abstract-hd-electrum-wallet';
 import presentAlert from '../../components/Alert';
-import ListItem from '../../components/ListItem';
+import Divider from '../../components/Divider';
+import { SettingsSection, SettingsListItem } from '../../components/SettingsSection';
 import { SecondButton } from '../../components/SecondButton';
 import { useTheme } from '../../components/themes';
 import prompt from '../../helpers/prompt';
 import { unlockWithBiometrics, useBiometrics } from '../../hooks/useBiometrics';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import loc, { formatBalanceWithoutSuffix } from '../../loc';
 import { DoichainUnit, Chain } from '../../models/doichainUnits';
 import { useStorage } from '../../hooks/context/useStorage';
-import { useFocusEffect, useRoute, RouteProp, usePreventRemove, useLocale } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute, RouteProp, usePreventRemove, useLocale } from '@react-navigation/native';
 import { LightningTransaction, Transaction, TWallet } from '../../class/wallets/types';
 import { DetailViewStackParamList } from '../../navigation/DetailViewStackParamList';
 import ToolTipMenu from '../../components/TooltipMenu';
@@ -33,8 +43,10 @@ import SafeAreaScrollView from '../../components/SafeAreaScrollView';
 import { BlueSpacing20 } from '../../components/BlueSpacing';
 import { BlueLoading } from '../../components/BlueLoading';
 import Icon from '../../components/Icon';
+import { navigateToWalletsList } from '../../NavigationService';
 
 type RouteProps = RouteProp<DetailViewStackParamList, 'WalletDetails'>;
+const IMPORT_NOTES_ACTION_ID = 'import_notes';
 
 function getCoinControlStats(w: TWallet): { hasCoinControl: boolean; utxoCount: number | null } {
   if (typeof w.getUtxo !== 'function') return { hasCoinControl: false, utxoCount: null };
@@ -46,7 +58,7 @@ function getCoinControlStats(w: TWallet): { hasCoinControl: boolean; utxoCount: 
 }
 
 const WalletDetails: React.FC = () => {
-  const { saveToDisk, wallets, txMetadata, handleWalletDeletion, sleep } = useStorage();
+  const { saveToDisk, wallets, txMetadata = {}, handleWalletDeletion, sleep } = useStorage();
   const { isBiometricUseCapableAndEnabled } = useBiometrics();
   const { walletID } = useRoute<RouteProps>().params;
   const { direction } = useLocale();
@@ -66,11 +78,14 @@ const WalletDetails: React.FC = () => {
   const [hideTransactionsInWalletsList, setHideTransactionsInWalletsList] = useState<boolean>(
     wallet.getHideTransactionsInWalletsList ? !wallet.getHideTransactionsInWalletsList() : true,
   );
-  const { setOptions, navigate, navigateToWalletsList } = useExtendedNavigation();
+  const { navigate } = useNavigation();
   const { colors } = useTheme();
 
   const [masterFingerprint, setMasterFingerprint] = useState<string | undefined>();
   const [walletName, setWalletName] = useState<string>(wallet.getLabel());
+  const [importedNoteResults, setImportedNoteResults] = useState<Map<string, string>>(new Map());
+  const [pendingNoteUpdates, setPendingNoteUpdates] = useState<Map<string, string>>(new Map());
+  const [selectedNoteOverwrites, setSelectedNoteOverwrites] = useState<Set<string>>(new Set());
   const walletTransactionsLength = useMemo<number>(() => wallet.getTransactions().length, [wallet]);
   const [coinControlStats, setCoinControlStats] = useState(() => getCoinControlStats(wallet));
 
@@ -104,6 +119,7 @@ const WalletDetails: React.FC = () => {
   );
 
   const { hasCoinControl, utxoCount } = coinControlStats;
+  const [metadataNonce, setMetadataNonce] = useState<number>(0);
   const derivationPath = useMemo<string | null>(() => {
     try {
       // @ts-expect-error: Need to fix later
@@ -116,7 +132,9 @@ const WalletDetails: React.FC = () => {
     } catch (e) {
       return null;
     }
-  }, [wallet]);
+    // metadataNonce bumps when the user edits watch-only metadata in place
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet, metadataNonce]);
   const [isMasterFingerPrintVisible, setIsMasterFingerPrintVisible] = useState<boolean>(false);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState<boolean>(false);
 
@@ -192,23 +210,35 @@ const WalletDetails: React.FC = () => {
   }, [isBiometricUseCapableAndEnabled, navigateToOverviewAndDeleteWallet, presentWalletHasBalanceAlert, wallet]);
 
   const exportHistoryContent = useCallback(() => {
-    const headers = [loc.transactions.date, loc.transactions.txid, `${loc.send.create_amount} (${DoichainUnit.DOI})`, loc.send.create_memo];
-    if (wallet.chain === Chain.OFFCHAIN) {
-      headers.push(loc.lnd.payment);
+    const transactions = wallet.getTransactions();
+
+    if (wallet.chain === Chain.ONCHAIN) {
+      return transactions
+        .flatMap(transaction => {
+          const transactionId = transaction.hash || transaction.txid;
+          if (!transactionId) return [];
+
+          const memo = txMetadata?.[transactionId]?.memo?.trim();
+          return [encodeBip329TransactionLabel(transactionId, memo || undefined)];
+        })
+        .join('\n');
     }
 
-    const rows = [headers.join(',')];
-    const transactions = wallet.getTransactions();
+    const headers = [loc.transactions.date, loc.transactions.txid, `${loc.send.create_amount} (${DoichainUnit.DOI})`, loc.send.create_memo];
+    headers.push(loc.lnd.payment);
+
+    const rows = [encodeCsvRow(headers)];
 
     transactions.forEach((transaction: Transaction & LightningTransaction) => {
       const value = formatBalanceWithoutSuffix(transaction.value || 0, DoichainUnit.DOI, true);
-      let hash: string = transaction.hash || '';
-      let memo = (transaction.hash && txMetadata[transaction.hash]?.memo?.trim()) || '';
+      let hash: string = transaction.hash || transaction.txid || '';
+      const metadataKey = transaction.hash || transaction.txid;
+      let memo = (metadataKey && txMetadata?.[metadataKey]?.memo?.trim()) || '';
       let status = '';
 
       if (wallet.chain === Chain.OFFCHAIN) {
         hash = transaction.payment_hash ? transaction.payment_hash.toString() : '';
-        memo = transaction.memo || '';
+        memo = memo || transaction.memo || '';
         status = transaction.ispaid ? loc._.success : loc.lnd.expired;
         if (typeof hash !== 'string' && (hash as any)?.type === 'Buffer' && (hash as any)?.data) {
           hash = uint8ArrayToHex(new Uint8Array((hash as any).data));
@@ -222,7 +252,7 @@ const WalletDetails: React.FC = () => {
         data.push(status);
       }
 
-      rows.push(data.join(','));
+      rows.push(encodeCsvRow(data));
     });
 
     return rows.join('\n');
@@ -230,8 +260,90 @@ const WalletDetails: React.FC = () => {
 
   const fileName = useMemo(() => {
     const label = wallet.getLabel().replace(' ', '-');
-    return `${label}-history.csv`;
+    const extension = wallet.chain === Chain.ONCHAIN ? 'jsonl' : 'csv';
+    return `${label}-history.${extension}`;
   }, [wallet]);
+
+  const applyNoteUpdates = useCallback(
+    async (updates: ReadonlyMap<string, string>) => {
+      try {
+        await applyWalletHistoryNoteUpdates(txMetadata, updates, saveToDisk);
+        triggerHapticFeedback(HapticFeedbackTypes.NotificationSuccess);
+        setPendingNoteUpdates(new Map());
+        setSelectedNoteOverwrites(new Set());
+        setImportedNoteResults(new Map(updates));
+      } catch (error: unknown) {
+        triggerHapticFeedback(HapticFeedbackTypes.NotificationError);
+        presentAlert({
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+    [saveToDisk, txMetadata],
+  );
+
+  const importNotes = useCallback(async () => {
+    if (wallet.chain !== Chain.ONCHAIN) return;
+
+    const { data } = await showFilePickerAndReadFile();
+    if (data === false) return;
+
+    let importedNotes;
+    try {
+      importedNotes = parseWalletHistoryNotes(data);
+    } catch {
+      triggerHapticFeedback(HapticFeedbackTypes.NotificationError);
+      presentAlert({ message: loc.wallets.import_error });
+      return;
+    }
+
+    const transactionMetadataKeys = new Map<string, string>();
+    for (const transaction of wallet.getTransactions()) {
+      const transactionId = transaction.hash || transaction.txid;
+      if (transactionId) transactionMetadataKeys.set(transactionId.toLowerCase(), transactionId);
+    }
+
+    const { updates, overwriteCount } = planWalletHistoryNoteImport(importedNotes, transactionMetadataKeys, txMetadata);
+
+    if (updates.size === 0) {
+      presentAlert({ message: loc.wallets.details_import_notes_no_changes });
+      return;
+    }
+
+    if (overwriteCount === 0) {
+      await applyNoteUpdates(updates);
+      return;
+    }
+
+    triggerHapticFeedback(HapticFeedbackTypes.NotificationWarning);
+    setPendingNoteUpdates(new Map(updates));
+    setSelectedNoteOverwrites(new Set([...updates.keys()].filter(metadataKey => Boolean(txMetadata[metadataKey]?.memo?.trim()))));
+  }, [applyNoteUpdates, txMetadata, wallet]);
+
+  const overwriteNoteUpdates = useMemo(
+    () => [...pendingNoteUpdates].filter(([metadataKey]) => Boolean(txMetadata[metadataKey]?.memo?.trim())),
+    [pendingNoteUpdates, txMetadata],
+  );
+
+  const selectedNoteUpdates = useMemo(
+    () => selectWalletHistoryNoteUpdates(pendingNoteUpdates, txMetadata, selectedNoteOverwrites),
+    [pendingNoteUpdates, selectedNoteOverwrites, txMetadata],
+  );
+
+  const closeImportNotesModal = useCallback(() => {
+    setImportedNoteResults(new Map());
+    setPendingNoteUpdates(new Map());
+    setSelectedNoteOverwrites(new Set());
+  }, []);
+
+  const toggleNoteOverwrite = useCallback((transactionId: string) => {
+    setSelectedNoteOverwrites(current => {
+      const selected = new Set(current);
+      if (selected.has(transactionId)) selected.delete(transactionId);
+      else selected.add(transactionId);
+      return selected;
+    });
+  }, []);
 
   const toolTipOnPressMenuItem = useCallback(
     async (id: string) => {
@@ -239,9 +351,11 @@ const WalletDetails: React.FC = () => {
         await writeFileAndExport(fileName, exportHistoryContent(), true);
       } else if (id === CommonToolTipActions.SaveFile.id) {
         await writeFileAndExport(fileName, exportHistoryContent(), false);
+      } else if (id === IMPORT_NOTES_ACTION_ID) {
+        await importNotes();
       }
     },
-    [exportHistoryContent, fileName],
+    [exportHistoryContent, fileName, importNotes],
   );
 
   const transactionsBoxMenuActions = useMemo(
@@ -253,15 +367,15 @@ const WalletDetails: React.FC = () => {
         hidden: walletTransactionsLength === 0,
         subactions: [CommonToolTipActions.Share, CommonToolTipActions.SaveFile],
       },
+      {
+        id: IMPORT_NOTES_ACTION_ID,
+        text: loc.wallets.details_import_notes,
+        icon: CommonToolTipActions.ImportFile.icon,
+        hidden: walletTransactionsLength === 0 || wallet.chain !== Chain.ONCHAIN,
+      },
     ],
-    [walletTransactionsLength],
+    [wallet.chain, walletTransactionsLength],
   );
-
-  useEffect(() => {
-    setOptions({
-      headerRight: undefined,
-    });
-  }, [setOptions]);
 
   useEffect(() => {
     setIsContactsVisible(wallet.allowBIP47 && wallet.allowBIP47() && isBIP47Enabled);
@@ -314,29 +428,8 @@ const WalletDetails: React.FC = () => {
     editButtonText: {
       color: colors.buttonTextColor,
     },
-    optionsSectionHeader: {
-      borderColor: colors.cardBorderColor,
-    },
     detailsCard: {
       borderColor: colors.cardBorderColor,
-    },
-    sectionTitle: {
-      backgroundColor: colors.cardSectionHeaderBackground,
-    },
-    sectionTitleText: {
-      color: colors.foregroundColor,
-    },
-    optionsContent: {
-      backgroundColor: colors.cardSectionBackground,
-      borderBottomLeftRadius: 12,
-      borderBottomRightRadius: 12,
-      overflow: 'hidden',
-    },
-    advancedContent: {
-      backgroundColor: colors.cardSectionBackground,
-      borderBottomLeftRadius: 12,
-      borderBottomRightRadius: 12,
-      overflow: 'hidden',
     },
     advancedListItemTitle: {
       color: colors.feeText,
@@ -350,10 +443,6 @@ const WalletDetails: React.FC = () => {
     },
     statsBoxNumber: {
       color: colors.foregroundColor,
-    },
-    listItemContainerBorder: {
-      backgroundColor: 'transparent',
-      borderBottomColor: colors.cardBorderColor,
     },
   });
 
@@ -492,6 +581,53 @@ const WalletDetails: React.FC = () => {
     setIsMasterFingerPrintVisible(true);
   };
 
+  const isWatchOnlyHd = wallet.type === WatchOnlyWallet.type && wallet.isHd && wallet.isHd();
+
+  const onEditDerivationPathPress = async () => {
+    let newPath: string;
+    try {
+      newPath = await prompt(loc.wallets.details_derivation_path, loc.wallets.details_derivation_path_edit, {
+        type: 'plain-text',
+        defaultValue: derivationPath ?? '',
+      });
+    } catch (_) {
+      return; // cancelled
+    }
+    newPath = normalizeDerivationPath(newPath);
+    if (!validateBip32(newPath)) {
+      presentAlert({ message: loc.wallets.details_derivation_path_invalid });
+      return;
+    }
+    (wallet as WatchOnlyWallet).setDerivationPath(newPath);
+    await saveToDisk();
+    setMetadataNonce(nonce => nonce + 1);
+  };
+
+  const onEditMasterFingerprintPress = async () => {
+    let newFingerprint: string;
+    try {
+      newFingerprint = await prompt(loc.wallets.details_master_fingerprint, loc.wallets.details_master_fingerprint_edit, {
+        type: 'plain-text',
+        defaultValue: masterFingerprint === '00000000' ? '' : (masterFingerprint ?? ''),
+      });
+    } catch (_) {
+      return; // cancelled
+    }
+    newFingerprint = newFingerprint.trim().toLowerCase();
+    if (!/^[0-9a-f]{8}$/.test(newFingerprint)) {
+      presentAlert({ message: loc.wallets.details_master_fingerprint_invalid });
+      return;
+    }
+    (wallet as WatchOnlyWallet).setMasterFingerprintFromHex(newFingerprint);
+    await saveToDisk();
+    setMasterFingerprint((wallet as WatchOnlyWallet).getMasterFingerprintHex());
+  };
+
+  let onMasterFingerprintPress: (() => void) | undefined = onViewMasterFingerPrintPress;
+  if (isMasterFingerPrintVisible) {
+    onMasterFingerprintPress = isWatchOnlyHd ? onEditMasterFingerprintPress : undefined;
+  }
+
   return (
     <SafeAreaScrollView centerContent={isLoading} testID="WalletDetailsScroll">
       <>
@@ -507,19 +643,19 @@ const WalletDetails: React.FC = () => {
                   numberOfLines={1}
                   ellipsizeMode="tail"
                   testID="WalletNameDisplay"
+                  selectable
                 >
                   {walletName}
                 </Text>
-                <TouchableOpacity
-                  style={[styles.editButton, stylesHook.editButton]}
+                <Pressable
+                  style={({ pressed }) => [styles.editButton, stylesHook.editButton, pressed && styles.pressablePressed]}
                   onPress={handleEditWalletName}
                   disabled={isLoading}
                   accessibilityRole="button"
                   testID="WalletNameEditButton"
-                  activeOpacity={0.7}
                 >
                   <BlueText style={[styles.editButtonText, stylesHook.editButtonText]}>{loc.wallets.details_edit}</BlueText>
-                </TouchableOpacity>
+                </Pressable>
               </View>
               {wallet.type === HDAezeedWallet.type && (
                 <>
@@ -532,20 +668,18 @@ const WalletDetails: React.FC = () => {
             {/* Address (watch-address wallets only) */}
             {([LegacyWallet.type, SegwitBech32Wallet.type, SegwitP2SHWallet.type].includes(wallet.type) ||
               (wallet.type === WatchOnlyWallet.type && !wallet.isHd())) && (
-              <View style={[styles.detailsCard, stylesHook.detailsCard]}>
-                <View style={stylesHook.optionsContent}>
-                  <Text style={[styles.textLabel2, stylesHook.textLabel2, styles.optionsSubheader]}>{loc.wallets.details_address}</Text>
-                  <Text style={[styles.textValue, stylesHook.textValue, styles.addressSectionContent]} selectable>
-                    {(() => {
-                      try {
-                        return wallet.getAddress ? wallet.getAddress() : '';
-                      } catch (error: unknown) {
-                        return (error as Error).message;
-                      }
-                    })()}
-                  </Text>
-                </View>
-              </View>
+              <SettingsSection>
+                <Text style={[styles.textLabel2, stylesHook.textLabel2, styles.optionsSubheader]}>{loc.wallets.details_address}</Text>
+                <Text style={[styles.textValue, stylesHook.textValue, styles.addressSectionContent]} selectable>
+                  {(() => {
+                    try {
+                      return wallet.getAddress ? wallet.getAddress() : '';
+                    } catch (error: unknown) {
+                      return (error as Error).message;
+                    }
+                  })()}
+                </Text>
+              </SettingsSection>
             )}
 
             {/* Stats */}
@@ -570,10 +704,9 @@ const WalletDetails: React.FC = () => {
                   <BlueText style={[styles.statsBoxNumber, stylesHook.statsBoxNumber]}>{wallet.getTransactions().length}</BlueText>
                 </View>
                 {hasCoinControl && utxoCount !== null && utxoCount > 0 ? (
-                  <TouchableOpacity
-                    style={[styles.statsBox, stylesHook.statsBox]}
+                  <Pressable
+                    style={({ pressed }) => [styles.statsBox, stylesHook.statsBox, pressed && styles.pressablePressed]}
                     onPress={() => navigate('SendDetailsRoot', { screen: 'CoinControl', params: { walletID } })}
-                    activeOpacity={0.8}
                     testID="CoinsStatsBox"
                   >
                     <View style={styles.statsBoxTitleRow}>
@@ -581,7 +714,7 @@ const WalletDetails: React.FC = () => {
                       <View style={styles.statsBoxTitleRowSpacer} />
                     </View>
                     <BlueText style={[styles.statsBoxNumber, stylesHook.statsBoxNumber]}>{utxoCount}</BlueText>
-                  </TouchableOpacity>
+                  </Pressable>
                 ) : (
                   <View style={[styles.statsBox, stylesHook.statsBox]} testID="CoinsStatsBox">
                     <View style={styles.statsBoxTitleRow}>
@@ -600,188 +733,149 @@ const WalletDetails: React.FC = () => {
             {(wallet instanceof AbstractHDElectrumWallet ||
               (wallet.type === WatchOnlyWallet.type && wallet.isHd && wallet.isHd()) ||
               isContactsVisible) && (
-              <View style={[styles.detailsCard, stylesHook.detailsCard]}>
-                <View style={stylesHook.optionsContent}>
-                  {(wallet instanceof AbstractHDElectrumWallet ||
-                    (wallet.type === WatchOnlyWallet.type && wallet.isHd && wallet.isHd())) && (
-                    <ListItem
-                      containerStyle={stylesHook.listItemContainerBorder}
-                      onPress={navigateToAddresses}
-                      title={loc.wallets.details_show_addresses}
-                      chevron
-                      bottomDivider={!!isContactsVisible}
-                    />
-                  )}
-                  {isContactsVisible ? (
-                    <ListItem
-                      containerStyle={stylesHook.listItemContainerBorder}
-                      onPress={navigateToContacts}
-                      title={loc.bip47.contacts}
-                      chevron
-                      bottomDivider={false}
-                    />
-                  ) : null}
-                </View>
-              </View>
+              <SettingsSection>
+                {(wallet instanceof AbstractHDElectrumWallet || (wallet.type === WatchOnlyWallet.type && wallet.isHd && wallet.isHd())) && (
+                  <SettingsListItem
+                    onPress={navigateToAddresses}
+                    title={loc.wallets.details_show_addresses}
+                    chevron
+                    bottomDivider={!!isContactsVisible}
+                  />
+                )}
+                {isContactsVisible ? (
+                  <SettingsListItem onPress={navigateToContacts} title={loc.bip47.contacts} chevron bottomDivider={false} />
+                ) : null}
+              </SettingsSection>
             )}
 
             {/* Options container — header full width (single row so section background spans the card) */}
-            <View style={[styles.detailsCard, stylesHook.detailsCard]}>
-              <View
-                style={[
-                  styles.sectionTitle,
-                  stylesHook.sectionTitle,
-                  styles.sectionTitleRowContainer,
-                  styles.optionsSectionHeader,
-                  stylesHook.optionsSectionHeader,
-                ]}
-              >
-                <BlueText style={[styles.sectionTitleText, stylesHook.sectionTitleText]}>{loc.wallets.details_options}</BlueText>
-              </View>
-              <View style={stylesHook.optionsContent}>
-                {wallet.type === WatchOnlyWallet.type && wallet.isHd && wallet.isHd() && (
-                  <>
-                    <Text style={[styles.textLabel2, stylesHook.textLabel2, styles.optionsSubheader]}>{loc.wallets.details_advanced}</Text>
-                    <ListItem
-                      containerStyle={styles.listItemContainerBorderLight}
-                      title={loc.wallets.details_use_with_hardware_wallet}
-                      switch={{
-                        value: walletUseWithHardwareWallet,
-                        onValueChange: async (value: boolean) => {
-                          setWalletUseWithHardwareWallet(value);
-                          if (wallet.setUseWithHardwareWalletEnabled) {
-                            wallet.setUseWithHardwareWalletEnabled(value);
-                            triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
-                          }
-                          try {
-                            await saveToDisk();
-                          } catch (error: unknown) {
-                            triggerHapticFeedback(HapticFeedbackTypes.NotificationError);
-                            console.error((error as Error).message);
-                          }
-                        },
-                      }}
-                      bottomDivider
-                    />
-                  </>
-                )}
-                <Text onPress={exportInternals} style={[styles.textLabel2, stylesHook.textLabel2, styles.optionsSubheader]}>
-                  {loc.transactions.list_title}
-                </Text>
-                <ListItem
-                  containerStyle={stylesHook.listItemContainerBorder}
-                  title={loc.wallets.details_display}
-                  switch={{
-                    value: hideTransactionsInWalletsList,
-                    onValueChange: async (value: boolean) => {
-                      if (wallet.setHideTransactionsInWalletsList) {
-                        wallet.setHideTransactionsInWalletsList(!value);
-                        triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
-                        setHideTransactionsInWalletsList(!wallet.getHideTransactionsInWalletsList());
-                      }
-                      try {
-                        await saveToDisk();
-                      } catch (error: any) {
-                        triggerHapticFeedback(HapticFeedbackTypes.NotificationError);
-                        console.error(error.message);
-                      }
-                    },
-                  }}
-                  bottomDivider
-                />
-                {wallet.allowBIP47 && wallet.allowBIP47() && (
-                  <>
-                    <Text style={[styles.textLabel2, stylesHook.textLabel2, styles.optionsSubheader]}>{loc.bip47.payment_code}</Text>
-                    <ListItem
-                      containerStyle={stylesHook.listItemContainerBorder}
-                      title={loc.bip47.purpose}
-                      switch={{
-                        value: isBIP47Enabled,
-                        onValueChange: async (value: boolean) => {
-                          setIsBIP47Enabled(value);
-                          if (wallet.switchBIP47) {
-                            wallet.switchBIP47(value);
-                            triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
-                          }
-                          try {
-                            await saveToDisk();
-                          } catch (error: unknown) {
-                            triggerHapticFeedback(HapticFeedbackTypes.NotificationError);
-                            console.error((error as Error).message);
-                          }
-                        },
-                      }}
-                      switchTestID="BIP47Switch"
-                      bottomDivider
-                    />
-                  </>
-                )}
-                {wallet.allowXpub && wallet.allowXpub() && (
-                  <ListItem
-                    containerStyle={stylesHook.listItemContainerBorder}
-                    onPress={navigateToXPub}
-                    title={loc.wallets.details_show_xpub}
-                    chevron
-                    testID="XpubButton"
+            <SettingsSection title={loc.wallets.details_options}>
+              {wallet.type === WatchOnlyWallet.type && wallet.isHd && wallet.isHd() && (
+                <>
+                  <Text style={[styles.textLabel2, stylesHook.textLabel2, styles.optionsSubheader]}>{loc.wallets.details_advanced}</Text>
+                  <SettingsListItem
+                    title={loc.wallets.details_use_with_hardware_wallet}
+                    switch={{
+                      value: walletUseWithHardwareWallet,
+                      onValueChange: async (value: boolean) => {
+                        setWalletUseWithHardwareWallet(value);
+                        if (wallet.setUseWithHardwareWalletEnabled) {
+                          wallet.setUseWithHardwareWalletEnabled(value);
+                          triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
+                        }
+                        try {
+                          await saveToDisk();
+                        } catch (error: unknown) {
+                          triggerHapticFeedback(HapticFeedbackTypes.NotificationError);
+                          console.error((error as Error).message);
+                        }
+                      },
+                    }}
                     bottomDivider
                   />
-                )}
-                {wallet.allowSignVerifyMessage && wallet.allowSignVerifyMessage() && (
-                  <ListItem
-                    containerStyle={stylesHook.listItemContainerBorder}
-                    onPress={navigateToSignVerify}
-                    title={loc.addresses.sign_title}
-                    chevron
-                    testID="SignVerify"
-                    bottomDivider={!!(wallet.type === MultisigHDWallet.type)}
+                </>
+              )}
+              <Text onPress={exportInternals} style={[styles.textLabel2, stylesHook.textLabel2, styles.optionsSubheader]}>
+                {loc.transactions.list_title}
+              </Text>
+              <SettingsListItem
+                title={loc.wallets.details_display}
+                switch={{
+                  value: hideTransactionsInWalletsList,
+                  onValueChange: async (value: boolean) => {
+                    if (wallet.setHideTransactionsInWalletsList) {
+                      wallet.setHideTransactionsInWalletsList(!value);
+                      triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
+                      setHideTransactionsInWalletsList(!wallet.getHideTransactionsInWalletsList());
+                    }
+                    try {
+                      await saveToDisk();
+                    } catch (error: any) {
+                      triggerHapticFeedback(HapticFeedbackTypes.NotificationError);
+                      console.error(error.message);
+                    }
+                  },
+                }}
+                bottomDivider
+              />
+              {wallet.allowBIP47 && wallet.allowBIP47() && (
+                <>
+                  <Text style={[styles.textLabel2, stylesHook.textLabel2, styles.optionsSubheader]}>{loc.bip47.payment_code}</Text>
+                  <SettingsListItem
+                    title={loc.bip47.purpose}
+                    switch={{
+                      value: isBIP47Enabled,
+                      onValueChange: async (value: boolean) => {
+                        setIsBIP47Enabled(value);
+                        if (wallet.switchBIP47) {
+                          wallet.switchBIP47(value);
+                          triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
+                        }
+                        try {
+                          await saveToDisk();
+                        } catch (error: unknown) {
+                          triggerHapticFeedback(HapticFeedbackTypes.NotificationError);
+                          console.error((error as Error).message);
+                        }
+                      },
+                    }}
+                    switchTestID="BIP47Switch"
+                    bottomDivider
                   />
-                )}
-                {wallet.type === MultisigHDWallet.type && (
-                  <>
-                    <ListItem
-                      containerStyle={stylesHook.listItemContainerBorder}
-                      onPress={navigateToMultisigCoordinationSetup}
-                      title={loc.multisig.export_coordination_setup.replace(/^\w/, (c: string) => c.toUpperCase())}
-                      chevron
-                      testID="MultisigCoordinationSetup"
-                      bottomDivider
-                    />
-                    <ListItem
-                      containerStyle={stylesHook.listItemContainerBorder}
-                      onPress={navigateToViewEditCosigners}
-                      title={loc.multisig.view_edit_cosigners}
-                      chevron
-                      testID="ViewEditCosigners"
-                      bottomDivider={false}
-                    />
-                  </>
-                )}
-              </View>
-            </View>
+                </>
+              )}
+              {wallet.allowXpub && wallet.allowXpub() && (
+                <SettingsListItem onPress={navigateToXPub} title={loc.wallets.details_show_xpub} testID="XpubButton" bottomDivider />
+              )}
+              {wallet.allowSignVerifyMessage && wallet.allowSignVerifyMessage() && (
+                <SettingsListItem
+                  onPress={navigateToSignVerify}
+                  title={loc.addresses.sign_title}
+                  testID="SignVerify"
+                  bottomDivider={!!(wallet.type === MultisigHDWallet.type)}
+                />
+              )}
+              {wallet.type === MultisigHDWallet.type && (
+                <>
+                  <SettingsListItem
+                    onPress={navigateToMultisigCoordinationSetup}
+                    title={loc.multisig.export_coordination_setup.replace(/^\w/, (c: string) => c.toUpperCase())}
+                    chevron
+                    testID="MultisigCoordinationSetup"
+                    bottomDivider
+                  />
+                  <SettingsListItem
+                    onPress={navigateToViewEditCosigners}
+                    title={loc.multisig.view_edit_cosigners}
+                    chevron
+                    testID="ViewEditCosigners"
+                    bottomDivider={false}
+                  />
+                </>
+              )}
+            </SettingsSection>
 
             {/* Advanced */}
-            <View style={[styles.detailsCard, stylesHook.detailsCard]}>
-              <TouchableOpacity
-                onPress={() => setIsAdvancedExpanded(prev => !prev)}
-                style={[styles.sectionTitle, stylesHook.sectionTitle, styles.sectionTitleRowContainer]}
-                activeOpacity={0.85}
-              >
-                <BlueText style={[styles.sectionTitleText, stylesHook.sectionTitleText]}>{loc.wallets.details_advanced}</BlueText>
+            <SettingsSection
+              title={loc.wallets.details_advanced}
+              onHeaderPress={() => setIsAdvancedExpanded(prev => !prev)}
+              headerRight={
                 <Icon
                   name={isAdvancedExpanded ? 'chevron-up' : 'chevron-down'}
                   type="font-awesome"
                   size={16}
                   color={colors.alternativeTextColor}
                 />
-              </TouchableOpacity>
+              }
+            >
               {isAdvancedExpanded && (
-                <View style={[styles.advancedContent, stylesHook.advancedContent]}>
-                  <ListItem
-                    containerStyle={stylesHook.listItemContainerBorder}
+                <>
+                  <SettingsListItem
                     title={loc.wallets.details_type}
                     titleStyle={stylesHook.advancedListItemTitle}
                     rightTitle={wallet.typeReadable}
                     rightTitleStyle={stylesHook.advancedListItemRightTitle}
+                    rightTitleSelectable
                     bottomDivider={
                       !!(
                         wallet.type === MultisigHDWallet.type ||
@@ -792,8 +886,7 @@ const WalletDetails: React.FC = () => {
                   />
                   {wallet.type === MultisigHDWallet.type && (
                     <>
-                      <ListItem
-                        containerStyle={stylesHook.listItemContainerBorder}
+                      <SettingsListItem
                         title={loc.wallets.details_multisig_type}
                         titleStyle={stylesHook.advancedListItemTitle}
                         rightTitle={`${wallet.getM()} / ${wallet.getN()} (${
@@ -802,8 +895,7 @@ const WalletDetails: React.FC = () => {
                         rightTitleStyle={stylesHook.advancedListItemRightTitle}
                         bottomDivider={!!(derivationPath || (wallet.allowMasterFingerprint && wallet.allowMasterFingerprint()))}
                       />
-                      <ListItem
-                        containerStyle={stylesHook.listItemContainerBorder}
+                      <SettingsListItem
                         title={loc.multisig.how_many_signatures_can_bluewallet_make}
                         titleStyle={stylesHook.advancedListItemTitle}
                         rightTitle={String(wallet.howManySignaturesCanWeMake())}
@@ -813,32 +905,33 @@ const WalletDetails: React.FC = () => {
                     </>
                   )}
                   {wallet.allowMasterFingerprint && wallet.allowMasterFingerprint() && (
-                    <ListItem
-                      containerStyle={stylesHook.listItemContainerBorder}
-                      onPress={isMasterFingerPrintVisible ? undefined : onViewMasterFingerPrintPress}
+                    <SettingsListItem
+                      onPress={onMasterFingerprintPress}
                       title={loc.wallets.details_master_fingerprint}
                       titleStyle={stylesHook.advancedListItemTitle}
                       rightTitle={
                         isMasterFingerPrintVisible ? (masterFingerprint ?? loc.wallets.import_derivation_loading) : loc.multisig.view
                       }
                       rightTitleStyle={stylesHook.advancedListItemRightTitle}
+                      rightTitleSelectable={isMasterFingerPrintVisible}
                       bottomDivider={!!derivationPath}
                     />
                   )}
                   {derivationPath && (
-                    <ListItem
-                      containerStyle={stylesHook.listItemContainerBorder}
+                    <SettingsListItem
+                      onPress={isWatchOnlyHd ? onEditDerivationPathPress : undefined}
                       title={loc.wallets.details_derivation_path}
                       titleStyle={stylesHook.advancedListItemTitle}
                       rightTitle={derivationPath}
                       rightTitleStyle={stylesHook.advancedListItemRightTitle}
+                      rightTitleSelectable
                       bottomDivider={false}
                       testID="DerivationPath"
                     />
                   )}
-                </View>
+                </>
               )}
-            </View>
+            </SettingsSection>
 
             <BlueCard style={styles.address}>
               <View>
@@ -861,12 +954,143 @@ const WalletDetails: React.FC = () => {
             </BlueCard>
           </>
         )}
+        <Modal
+          animationType="slide"
+          presentationStyle="formSheet"
+          visible={pendingNoteUpdates.size > 0 || importedNoteResults.size > 0}
+          onRequestClose={closeImportNotesModal}
+        >
+          <View style={[styles.importResultsModal, { backgroundColor: colors.modal }]} testID="ImportedNotesModal">
+            <Text style={[styles.importResultsTitle, { color: colors.foregroundColor }]}>
+              {pendingNoteUpdates.size > 0 ? loc.wallets.details_import_notes : loc._.success}
+            </Text>
+            <Text style={[styles.importResultsSummary, { color: colors.alternativeTextColor }]}>
+              {pendingNoteUpdates.size > 0
+                ? loc.wallets.details_import_notes_review
+                : loc.formatString(loc.wallets.details_import_notes_success, { count: importedNoteResults.size })}
+            </Text>
+            <FlatList
+              data={pendingNoteUpdates.size > 0 ? overwriteNoteUpdates : [...importedNoteResults]}
+              keyExtractor={item => item[0]}
+              testID="ImportedNotesList"
+              style={styles.importResultsList}
+              ItemSeparatorComponent={Divider}
+              renderItem={({ item: [transactionId, memo] }) => (
+                <Pressable
+                  style={({ pressed }) => [styles.importResultRow, pressed && styles.pressablePressed]}
+                  onPress={pendingNoteUpdates.size > 0 ? () => toggleNoteOverwrite(transactionId) : undefined}
+                  accessibilityRole={pendingNoteUpdates.size > 0 ? 'checkbox' : undefined}
+                  accessibilityState={pendingNoteUpdates.size > 0 ? { checked: selectedNoteOverwrites.has(transactionId) } : undefined}
+                  testID={`ImportedNote-${transactionId}`}
+                >
+                  <View style={styles.importResultContent}>
+                    {pendingNoteUpdates.size > 0 && (
+                      <Icon
+                        name={selectedNoteOverwrites.has(transactionId) ? 'check-box' : 'check-box-outline-blank'}
+                        type="material"
+                        size={24}
+                        color={colors.alternativeTextColor2}
+                      />
+                    )}
+                    <View style={[styles.importResultText, pendingNoteUpdates.size > 0 && styles.importResultTextWithCheckbox]}>
+                      {pendingNoteUpdates.size > 0 ? (
+                        <>
+                          <Text style={[styles.importResultMemo, { color: colors.foregroundColor }]} selectable>
+                            {loc.wallets.details_import_notes_before}: {txMetadata[transactionId]?.memo}
+                          </Text>
+                          <Text style={[styles.importResultMemo, { color: colors.foregroundColor }]} selectable>
+                            {loc.wallets.details_import_notes_after}: {memo || '—'}
+                          </Text>
+                        </>
+                      ) : (
+                        <Text style={[styles.importResultMemo, { color: colors.foregroundColor }]} selectable>
+                          {memo || '—'}
+                        </Text>
+                      )}
+                      <Text style={[styles.importResultTransactionId, { color: colors.alternativeTextColor }]} selectable>
+                        {transactionId}
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              )}
+            />
+            {pendingNoteUpdates.size > 0 ? (
+              <View style={styles.importResultsButtons}>
+                <SecondButton title={loc._.cancel} onPress={closeImportNotesModal} testID="CancelImportNotes" />
+                <View style={styles.importResultsButtonSpacer} />
+                <SecondButton
+                  title={loc.wallets.import_do_import}
+                  onPress={() => applyNoteUpdates(selectedNoteUpdates)}
+                  backgroundColor={colors.mainColor}
+                  textColor={colors.buttonTextColor}
+                  disabled={selectedNoteUpdates.size === 0}
+                  testID="ConfirmImportNotes"
+                />
+              </View>
+            ) : (
+              <SecondButton
+                title={loc._.close}
+                onPress={closeImportNotesModal}
+                backgroundColor={colors.mainColor}
+                textColor={colors.buttonTextColor}
+                testID="CloseImportedNotesModal"
+              />
+            )}
+          </View>
+        </Modal>
       </>
     </SafeAreaScrollView>
   );
 };
 
 const styles = StyleSheet.create({
+  importResultsModal: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+  },
+  importResultsTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  importResultsSummary: {
+    fontSize: 15,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  importResultsList: {
+    flex: 1,
+    marginBottom: 16,
+  },
+  importResultRow: {
+    paddingVertical: 14,
+  },
+  importResultContent: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+  },
+  importResultText: {
+    flex: 1,
+  },
+  importResultTextWithCheckbox: {
+    marginLeft: 12,
+  },
+  importResultMemo: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  importResultTransactionId: {
+    fontSize: 12,
+  },
+  importResultsButtons: {
+    flexDirection: 'row',
+  },
+  importResultsButtonSpacer: {
+    width: 12,
+  },
   address: {
     alignItems: 'center',
     flex: 1,
@@ -918,20 +1142,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
-  sectionTitle: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  sectionTitleRowContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sectionTitleText: {
-    fontSize: 17,
-    fontWeight: '600',
+  pressablePressed: {
+    opacity: 0.75,
   },
   optionsSubheader: {
     paddingTop: 8,
@@ -955,30 +1167,9 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
   },
-  optionsSectionHeader: {
-    width: '100%',
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 0,
-    minHeight: 44,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    overflow: 'hidden',
-  },
   statsBoxNumber: {
     fontSize: 32,
     fontWeight: '700',
-  },
-  advancedContent: {
-    marginTop: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-  },
-  listItemContainerBorderLight: {
-    backgroundColor: 'transparent',
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
 });
 

@@ -1,10 +1,11 @@
 import { Platform } from 'react-native';
-import { pick, types, keepLocalCopy, errorCodes } from '@react-native-documents/picker';
+import { pick, types, keepLocalCopy, errorCodes, saveDocuments } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs';
 import { launchImageLibrary, ImagePickerResponse } from 'react-native-image-picker';
 import { detectQRCodeInImage } from 'react-native-camera-kit-no-google';
 import Share from 'react-native-share';
 
+import type { TTXMetadata } from '../class/blue-app';
 import presentAlert from '../components/Alert';
 import loc from '../loc';
 import { isDesktop } from './environment';
@@ -20,23 +21,247 @@ export const isCancel = (err: any): boolean => {
   return err.code && err.code === errorCodes.OPERATION_CANCELED;
 };
 
+export const encodeCsvRow = (values: Array<string | number>): string =>
+  values
+    .map(value => {
+      const stringValue = String(value);
+      return /[",\r\n]/.test(stringValue) ? `"${stringValue.replace(/"/g, '""')}"` : stringValue;
+    })
+    .join(',');
+
+export const encodeBip329TransactionLabel = (transactionId: string, label?: string): string =>
+  JSON.stringify(label === undefined ? { type: 'tx', ref: transactionId } : { type: 'tx', ref: transactionId, label });
+
+const parseCsv = (contents: string): string[][] => {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let value = '';
+  let quoted = false;
+
+  for (let index = 0; index < contents.length; index++) {
+    const character = contents[index];
+
+    if (quoted) {
+      if (character === '"' && contents[index + 1] === '"') {
+        value += '"';
+        index++;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        value += character;
+      }
+    } else if (character === '"' && value.length === 0) {
+      quoted = true;
+    } else if (character === ',') {
+      row.push(value);
+      value = '';
+    } else if (character === '\n' || character === '\r') {
+      if (character === '\r' && contents[index + 1] === '\n') index++;
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = '';
+    } else {
+      value += character;
+    }
+  }
+
+  if (quoted) throw new Error('Unterminated quoted field');
+  if (row.length > 0 || value.length > 0) {
+    row.push(value);
+    rows.push(row);
+  }
+
+  return rows;
+};
+
+const parseBip329TransactionNotes = (contents: string): Array<{ transactionId: string; memo: string }> =>
+  contents
+    .split(/\r?\n/)
+    .filter(line => line.trim().length > 0)
+    .flatMap(line => {
+      const record: unknown = JSON.parse(line);
+      if (!record || typeof record !== 'object' || Array.isArray(record)) throw new Error('Invalid BIP-329 record');
+
+      const { type, ref, label } = record as Record<string, unknown>;
+      if (typeof type !== 'string' || typeof ref !== 'string') throw new Error('Invalid BIP-329 record');
+      if (type !== 'tx' || label === undefined) return [];
+      if (!/^[0-9a-f]{64}$/i.test(ref) || typeof label !== 'string') throw new Error('Invalid BIP-329 transaction label');
+
+      return [{ transactionId: ref, memo: label }];
+    });
+
+/**
+ * Reads transaction notes from BIP-329 JSONL or BlueWallet wallet-history CSV.
+ * Older BlueWallet exports did not escape commas in memos, so extra CSV
+ * columns are joined back into the memo.
+ */
+export const parseWalletHistoryNotes = (contents: string): Array<{ transactionId: string; memo: string }> => {
+  const normalizedContents = contents.replace(/^\uFEFF/, '').trimStart();
+  if (normalizedContents.startsWith('{')) return parseBip329TransactionNotes(normalizedContents);
+
+  const rows = parseCsv(normalizedContents);
+  if (rows.length === 0 || rows[0].length < 4) throw new Error('Invalid wallet history CSV');
+
+  return rows.slice(1).flatMap(row => {
+    if (row.length < 4) return [];
+
+    const transactionId = row[1].trim();
+    const memo = row.slice(3).join(',').trim();
+
+    return transactionId && memo ? [{ transactionId, memo }] : [];
+  });
+};
+
+export const planWalletHistoryNoteImport = (
+  importedNotes: Array<{ transactionId: string; memo: string }>,
+  transactionMetadataKeys: ReadonlyMap<string, string>,
+  metadata: TTXMetadata,
+): { updates: Map<string, string>; overwriteCount: number } => {
+  const updates = new Map<string, string>();
+
+  for (const importedNote of importedNotes) {
+    const metadataKey = transactionMetadataKeys.get(importedNote.transactionId.toLowerCase());
+    if (metadataKey && metadata[metadataKey]?.memo !== importedNote.memo) {
+      updates.set(metadataKey, importedNote.memo);
+    }
+  }
+
+  const overwriteCount = [...updates.keys()].filter(metadataKey => Boolean(metadata[metadataKey]?.memo?.trim())).length;
+  return { updates, overwriteCount };
+};
+
+export const selectWalletHistoryNoteUpdates = (
+  updates: ReadonlyMap<string, string>,
+  metadata: TTXMetadata,
+  selectedOverwrites: ReadonlySet<string>,
+): Map<string, string> =>
+  new Map([...updates].filter(([metadataKey]) => !metadata[metadataKey]?.memo?.trim() || selectedOverwrites.has(metadataKey)));
+
+export const applyWalletHistoryNoteUpdates = async (
+  metadata: TTXMetadata,
+  updates: ReadonlyMap<string, string>,
+  persist: () => Promise<void>,
+): Promise<void> => {
+  const previousMetadata = new Map([...updates.keys()].map(metadataKey => [metadataKey, metadata[metadataKey]]));
+  for (const [metadataKey, memo] of updates) metadata[metadataKey] = { memo };
+
+  try {
+    await persist();
+  } catch (error) {
+    for (const [metadataKey, previousValue] of previousMetadata) {
+      if (previousValue) metadata[metadataKey] = previousValue;
+      else delete metadata[metadataKey];
+    }
+    throw error;
+  }
+};
+
+const _safeUnlink = async (filePath: string) => {
+  const normalizedPath = decodeURI(filePath).replace(/^file:\/\//, '');
+  const candidates = [normalizedPath, filePath].filter((value, index, all) => all.indexOf(value) === index);
+
+  for (const candidate of candidates) {
+    try {
+      if (!(await RNFS.exists(candidate))) {
+        continue;
+      }
+
+      await RNFS.unlink(candidate);
+      return;
+    } catch (error: any) {
+      const message = String(error?.message || '').toLowerCase();
+      const notFound = message.includes('no such file') || message.includes('does not exist') || message.includes('enoent');
+
+      if (notFound) {
+        return;
+      }
+
+      console.warn('Failed to remove temporary file:', candidate, error);
+    }
+  }
+};
+
+const _toFileUri = (filePath: string) => {
+  return encodeURI(filePath.startsWith('file://') ? filePath : `file://${filePath}`);
+};
+
+const _createTempExportPath = (fileName: string) => {
+  const basePath = RNFS.CachesDirectoryPath || RNFS.TemporaryDirectoryPath;
+  return `${basePath}/${Date.now()}-${fileName}`;
+};
+
+const _mimeTypeFromFileName = (fileName: string): string => {
+  const extension = fileName.split('.').pop()?.toLowerCase();
+  switch (extension) {
+    case 'txt':
+    case 'txn':
+      return 'text/plain';
+    case 'json':
+      return 'application/json';
+    case 'jsonl':
+      return 'application/x-ndjson';
+    case 'csv':
+      return 'text/csv';
+    case 'pdf':
+      return 'application/pdf';
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    default:
+      return 'application/octet-stream';
+  }
+};
+
+const _transactionFilePickerTypes = ['application/octet-stream', 'text/plain'];
+
+const _pickSingleFileAndKeepLocalCopy = async (type: string[] = [types.allFiles]) => {
+  const [pickedFile] = await pick({
+    type,
+  });
+
+  if (!pickedFile.hasRequestedType) {
+    throw new Error(loc.send.details_unrecognized_file_format);
+  }
+
+  const [localCopy] = await keepLocalCopy({
+    files: [
+      {
+        uri: pickedFile.uri,
+        fileName: pickedFile.name ?? 'unnamed',
+      },
+    ],
+    destination: 'cachesDirectory',
+  });
+
+  if (localCopy.status !== 'success') {
+    throw new Error(localCopy.copyError || 'Could not create local file copy');
+  }
+
+  return {
+    localUri: decodeURI(localCopy.localUri),
+    fileName: pickedFile.name ?? 'unnamed',
+  };
+};
+
 const _shareOpen = async (filePath: string, showShareDialog: boolean = false) => {
   try {
     await Share.open({
       url: 'file://' + filePath,
       saveToFiles: isDesktop || !showShareDialog,
-      // @ts-ignore: Website claims this propertie exists, but TS cant find it. Send anyways.
-      useInternalStorage: Platform.OS === 'android',
       failOnCancel: false,
     });
   } catch (error: any) {
     console.log(error);
     // If user cancels sharing, we dont want to show an error. for some reason we get 'CANCELLED' string as error
-    if (error.message !== 'CANCELLED') {
-      presentAlert({ message: error.message });
+    const errorMessage = typeof error === 'string' ? error : error?.message;
+    if (errorMessage !== 'CANCELLED') {
+      presentAlert({ message: errorMessage });
     }
   } finally {
-    await RNFS.unlink(filePath);
+    await _safeUnlink(filePath);
   }
 };
 
@@ -48,25 +273,33 @@ const _shareOpen = async (filePath: string, showShareDialog: boolean = false) =>
 export const writeFileAndExport = async function (fileName: string, contents: string, showShareDialog: boolean = true) {
   const sanitizedFileName = _sanitizeFileName(fileName);
   try {
-    if (Platform.OS === 'ios') {
-      const filePath = `${RNFS.TemporaryDirectoryPath}/${sanitizedFileName}`;
-      await RNFS.writeFile(filePath, contents);
-      await _shareOpen(filePath, showShareDialog);
-    } else if (Platform.OS === 'android') {
-      const filePath = `${RNFS.DownloadDirectoryPath}/${sanitizedFileName}`;
+    if (!showShareDialog) {
+      const sourceFilePath = _createTempExportPath(sanitizedFileName);
       try {
-        await RNFS.writeFile(filePath, contents);
-        if (showShareDialog) {
-          await _shareOpen(filePath);
-        } else {
-          presentAlert({ message: loc.formatString(loc.send.file_saved_at_path, { filePath }) });
+        await RNFS.writeFile(sourceFilePath, contents);
+        const [savedFile] = await saveDocuments({
+          sourceUris: [_toFileUri(sourceFilePath)],
+          fileName: sanitizedFileName,
+          mimeType: _mimeTypeFromFileName(sanitizedFileName),
+          copy: true,
+        });
+
+        if (savedFile.error) {
+          throw new Error(savedFile.error);
         }
-      } catch (e: any) {
-        console.error(e);
-        presentAlert({ message: e.message });
+      } finally {
+        await _safeUnlink(sourceFilePath);
       }
+      return;
     }
+
+    const filePath = _createTempExportPath(sanitizedFileName);
+    await RNFS.writeFile(filePath, contents);
+    await _shareOpen(filePath, true);
   } catch (error: any) {
+    if (isCancel(error)) {
+      return;
+    }
     console.error(error);
     presentAlert({ message: error.message });
   }
@@ -77,11 +310,8 @@ export const writeFileAndExport = async function (fileName: string, contents: st
  */
 export const openSignedTransaction = async function (): Promise<string | false> {
   try {
-    const [res] = await pick({
-      type: [types.allFiles],
-    });
-
-    return await _readPsbtFileIntoBase64(res.uri);
+    const { localUri } = await _pickSingleFileAndKeepLocalCopy(_transactionFilePickerTypes);
+    return await _readPsbtFileIntoBase64(localUri);
   } catch (err) {
     if (!isCancel(err)) {
       presentAlert({ message: loc.send.details_no_signed_tx });
@@ -138,35 +368,16 @@ export const showImagePickerAndReadImage = async (): Promise<string | undefined>
 
 export const showFilePickerAndReadFile = async function (): Promise<{ data: string | false; uri: string | false }> {
   try {
-    const [pickedFile] = await pick({
-      type: [types.allFiles],
-    });
+    const { localUri: fileCopyUri } = await _pickSingleFileAndKeepLocalCopy();
+    const lowerCasePath = fileCopyUri.toLowerCase();
 
-    const [localCopy] = await keepLocalCopy({
-      files: [
-        {
-          uri: pickedFile.uri,
-          fileName: pickedFile.name ?? 'unnamed',
-        },
-      ],
-      destination: 'cachesDirectory',
-    });
-
-    if (localCopy.status !== 'success') {
-      // to make ts happy, should not need this check here
-      presentAlert({ message: 'Picking and caching a file failed: ' + localCopy.copyError });
-      return { data: false, uri: false };
-    }
-
-    const fileCopyUri = decodeURI(localCopy.localUri);
-
-    if (localCopy.localUri.toLowerCase().endsWith('.psbt')) {
+    if (lowerCasePath.endsWith('.psbt')) {
       // this is either binary file from ElectrumDesktop OR string file with base64 string in there
       const file = await _readPsbtFileIntoBase64(fileCopyUri);
       return { data: file, uri: fileCopyUri };
     }
 
-    if (localCopy.localUri.endsWith('.png') || localCopy.localUri.endsWith('.jpg') || localCopy.localUri.endsWith('.jpeg')) {
+    if (lowerCasePath.endsWith('.png') || lowerCasePath.endsWith('.jpg') || lowerCasePath.endsWith('.jpeg')) {
       return await handleImageFile(fileCopyUri);
     }
 
@@ -210,10 +421,8 @@ export const readFileOutsideSandbox = (filePath: string) => {
 
 export const openSignedTransactionRaw: () => Promise<string> = async () => {
   try {
-    const [res] = await pick({
-      type: [types.allFiles],
-    });
-    const file = await RNFS.readFile(res.uri);
+    const { localUri } = await _pickSingleFileAndKeepLocalCopy(_transactionFilePickerTypes);
+    const file = await RNFS.readFile(localUri);
     if (file) {
       return file;
     } else {
@@ -229,9 +438,9 @@ export const openSignedTransactionRaw: () => Promise<string> = async () => {
 };
 
 export const pickTransaction = async () => {
-  const [res] = await pick({
-    type: [types.allFiles],
-  });
-
-  return res;
+  const { localUri, fileName } = await _pickSingleFileAndKeepLocalCopy(_transactionFilePickerTypes);
+  return {
+    uri: localUri,
+    name: fileName,
+  };
 };

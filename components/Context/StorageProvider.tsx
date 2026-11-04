@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BlueApp as BlueAppClass, TCounterpartyMetadata, TTXMetadata } from '../../class/blue-app';
+import { BlueApp as BlueAppClass, TCounterpartyMetadata, TTXMetadata, TAddressMetadata } from '../../class/blue-app';
 import { LegacyWallet } from '../../class/wallets/legacy-wallet';
 import { WatchOnlyWallet } from '../../class/wallets/watch-only-wallet';
 import type { TWallet } from '../../class/wallets/types';
@@ -8,7 +8,7 @@ import loc, { formatBalanceWithoutSuffix } from '../../loc';
 import * as BlueElectrum from '../../blue_modules/BlueElectrum';
 import triggerHapticFeedback, { HapticFeedbackTypes } from '../../blue_modules/hapticFeedback';
 import { startAndDecrypt } from '../../blue_modules/start-and-decrypt';
-import { isNotificationsEnabled, majorTomToGroundControl, unsubscribe } from '../../blue_modules/notifications';
+import { majorTomToGroundControl, unsubscribe } from '../../blue_modules/notifications';
 import { DoichainUnit } from '../../models/doichainUnits';
 import { navigationRef } from '../../NavigationService';
 import { getScanWasBBQR } from '../../helpers/scan-qr.ts';
@@ -24,6 +24,7 @@ interface StorageContextType {
   setWalletsWithNewOrder: (wallets: TWallet[]) => void;
   txMetadata: TTXMetadata;
   counterpartyMetadata: TCounterpartyMetadata;
+  addressMetadata: TAddressMetadata;
   saveToDisk: (force?: boolean) => Promise<void>;
   selectedWalletID: () => string | undefined; // Change from string|undefined to a function
   addWallet: (wallet: TWallet) => void;
@@ -52,7 +53,7 @@ interface StorageContextType {
   cachedPassword: typeof BlueApp.cachedPassword;
   getItem: typeof BlueApp.getItem;
   setItem: typeof BlueApp.setItem;
-  handleWalletDeletion: (walletID: string, forceDelete?: boolean) => Promise<boolean>;
+  handleWalletDeletion: (walletID: string) => Promise<boolean>;
   confirmWalletDeletion: (wallet: any, onConfirmed: () => void) => void;
 }
 
@@ -65,8 +66,9 @@ export enum WalletTransactionsStatus {
 export const StorageContext = createContext<StorageContextType>(undefined);
 
 export const StorageProvider = ({ children }: { children: React.ReactNode }) => {
-  const txMetadata = useRef<TTXMetadata>(BlueApp.tx_metadata);
+  const txMetadata = useRef<TTXMetadata>(BlueApp.tx_metadata ?? {});
   const counterpartyMetadata = useRef<TCounterpartyMetadata>(BlueApp.counterparty_metadata || {}); // init
+  const addressMetadata = useRef<TAddressMetadata>(BlueApp.address_metadata || {});
 
   const [wallets, setWallets] = useState<TWallet[]>([]);
   const [walletTransactionUpdateStatus, setWalletTransactionUpdateStatus] = useState<WalletTransactionsStatus | string>(
@@ -74,6 +76,8 @@ export const StorageProvider = ({ children }: { children: React.ReactNode }) => 
   );
   const [walletsInitialized, setWalletsInitialized] = useState<boolean>(false);
   const [currentSharedCosigner, setCurrentSharedCosigner] = useState<string>('');
+  // Metadata refs are mutated in place, so their identity never changes; bumped on save to rebuild the context value.
+  const [metadataVersion, setMetadataVersion] = useState(0);
 
   const selectedWalletID = useCallback((): string | undefined => {
     if (!navigationRef.current || !navigationRef.current.isReady()) return undefined;
@@ -158,12 +162,14 @@ export const StorageProvider = ({ children }: { children: React.ReactNode }) => 
       }
       BlueApp.tx_metadata = txMetadata.current;
       BlueApp.counterparty_metadata = counterpartyMetadata.current;
+      BlueApp.address_metadata = addressMetadata.current;
       await BlueApp.saveToDisk();
       const w: TWallet[] = [...BlueApp.getWallets()];
       setWallets(w);
+      setMetadataVersion(v => v + 1);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [txMetadata.current, counterpartyMetadata.current],
+    [txMetadata.current, counterpartyMetadata.current, addressMetadata.current],
   );
 
   const addWallet = useCallback((wallet: TWallet) => {
@@ -177,7 +183,7 @@ export const StorageProvider = ({ children }: { children: React.ReactNode }) => 
   }, []);
 
   const handleWalletDeletion = useCallback(
-    async (walletID: string, forceDelete = false): Promise<boolean> => {
+    async (walletID: string): Promise<boolean> => {
       console.debug(`handleWalletDeletion: invoked for walletID ${walletID}`);
       const wallet = wallets.find(w => w.getID() === walletID);
       if (!wallet) {
@@ -185,107 +191,29 @@ export const StorageProvider = ({ children }: { children: React.ReactNode }) => 
         return false;
       }
 
-      if (forceDelete) {
+      const externalAddresses = wallet.getAllExternalAddresses();
+
+      try {
         deleteWallet(wallet);
         await saveToDisk(true);
         triggerHapticFeedback(HapticFeedbackTypes.NotificationSuccess);
-        return true;
-      }
-
-      let isNotificationsSettingsEnabled = false;
-      try {
-        isNotificationsSettingsEnabled = await isNotificationsEnabled();
-      } catch (error) {
-        console.error(`handleWalletDeletion: error checking notifications for wallet ${walletID}`, error);
-        return await new Promise<boolean>(resolve => {
-          presentAlert({
-            title: loc.errors.error,
-            message: loc.wallets.details_delete_wallet_error_message,
-            buttons: [
-              {
-                text: loc.wallets.details_delete_anyway,
-                onPress: async () => {
-                  const result = await handleWalletDeletion(walletID, true);
-                  resolve(result);
-                },
-                style: 'destructive',
-              },
-              {
-                text: loc.wallets.list_tryagain,
-                onPress: async () => {
-                  const result = await handleWalletDeletion(walletID);
-                  resolve(result);
-                },
-              },
-              {
-                text: loc._.cancel,
-                onPress: () => resolve(false),
-                style: 'cancel',
-              },
-            ],
-            options: { cancelable: false },
-          });
-        });
-      }
-
-      try {
-        if (isNotificationsSettingsEnabled) {
-          const externalAddresses = wallet.getAllExternalAddresses();
-          if (externalAddresses.length > 0) {
-            console.debug(`handleWalletDeletion: unsubscribing addresses for wallet ${walletID}`);
-            try {
-              await unsubscribe(externalAddresses, [], []);
-              console.debug(`handleWalletDeletion: unsubscribe succeeded for wallet ${walletID}`);
-            } catch (unsubscribeError) {
-              console.error(`handleWalletDeletion: unsubscribe failed for wallet ${walletID}`, unsubscribeError);
-              presentAlert({
-                title: loc.errors.error,
-                message: loc.wallets.details_delete_wallet_error_message,
-                buttons: [{ text: loc._.ok, onPress: () => {} }],
-                options: { cancelable: false },
-              });
-              return false;
-            }
-          }
-        }
-        deleteWallet(wallet);
-        console.debug(`handleWalletDeletion: wallet ${walletID} deleted successfully`);
-        await saveToDisk(true);
-        triggerHapticFeedback(HapticFeedbackTypes.NotificationSuccess);
-        return true;
       } catch (e: unknown) {
         console.error(`handleWalletDeletion: encountered error for wallet ${walletID}`, e);
         triggerHapticFeedback(HapticFeedbackTypes.NotificationError);
-        return await new Promise<boolean>(resolve => {
+        return false;
+      }
+
+      if (externalAddresses.length > 0) {
+        unsubscribe(externalAddresses, [], []).catch(error => {
+          console.error(`handleWalletDeletion: unsubscribe failed for wallet ${walletID}`, error);
           presentAlert({
             title: loc.errors.error,
             message: loc.wallets.details_delete_wallet_error_message,
-            buttons: [
-              {
-                text: loc.wallets.details_delete_anyway,
-                onPress: async () => {
-                  const result = await handleWalletDeletion(walletID, true);
-                  resolve(result);
-                },
-                style: 'destructive',
-              },
-              {
-                text: loc.wallets.list_tryagain,
-                onPress: async () => {
-                  const result = await handleWalletDeletion(walletID);
-                  resolve(result);
-                },
-              },
-              {
-                text: loc._.cancel,
-                onPress: () => resolve(false),
-                style: 'cancel',
-              },
-            ],
-            options: { cancelable: false },
           });
         });
       }
+
+      return true;
     },
     [deleteWallet, saveToDisk, wallets],
   );
@@ -305,9 +233,12 @@ export const StorageProvider = ({ children }: { children: React.ReactNode }) => 
   // Initialize wallets
   useEffect(() => {
     if (walletsInitialized) {
-      txMetadata.current = BlueApp.tx_metadata;
-      counterpartyMetadata.current = BlueApp.counterparty_metadata;
-      setWallets(BlueApp.getWallets());
+      txMetadata.current = BlueApp.tx_metadata ?? {};
+      BlueApp.tx_metadata = txMetadata.current;
+      counterpartyMetadata.current = BlueApp.counterparty_metadata ?? {};
+      addressMetadata.current = BlueApp.address_metadata ?? {};
+      const loaded = BlueApp.getWallets();
+      setWallets(loaded);
     }
   }, [walletsInitialized]);
 
@@ -520,6 +451,7 @@ export const StorageProvider = ({ children }: { children: React.ReactNode }) => 
       setWalletsWithNewOrder,
       txMetadata: txMetadata.current,
       counterpartyMetadata: counterpartyMetadata.current,
+      addressMetadata: addressMetadata.current,
       saveToDisk,
       getTransactions: BlueApp.getTransactions,
       selectedWalletID,
@@ -551,6 +483,8 @@ export const StorageProvider = ({ children }: { children: React.ReactNode }) => 
       handleWalletDeletion,
       confirmWalletDeletion,
     }),
+    // metadataVersion is deliberate: it is what rebuilds this value after an in-place metadata edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       wallets,
       setWalletsWithNewOrder,
@@ -567,6 +501,7 @@ export const StorageProvider = ({ children }: { children: React.ReactNode }) => 
       resetWallets,
       walletTransactionUpdateStatus,
       handleWalletDeletion,
+      metadataVersion,
     ],
   );
 

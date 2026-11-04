@@ -357,4 +357,23 @@ describe('BlueElectrum', () => {
     );
     if (disableBatching) BlueElectrum.setBatchingEnabled();
   });
+
+  it('getCurrentBlockTip() returns a positive block height', async () => {
+    const tip = await BlueElectrum.getCurrentBlockTip();
+    assert.ok(tip > 400_000); // Doichain stood near 436,000 in October 2026
+  });
+
+  it('getBlockTimestamps() returns unix timestamps for recent blocks', async () => {
+    const tip = await BlueElectrum.getCurrentBlockTip();
+    const timestamps = await BlueElectrum.getBlockTimestamps([tip, tip - 1]);
+    assert.ok(timestamps[tip] > 1_000_000_000);
+    assert.ok(timestamps[tip - 1] > 1_000_000_000);
+  });
+
+  it('getConfirmedBlockHeight() returns height and tip for a known confirmed tx', async () => {
+    // a confirmed Doichain transaction (a name operation on "reband", 13 October 2026)
+    const txid = 'a944ef94a898fa63a4d632d65063fb9988bc3a178be76b6986abe2ef409ed8a3';
+    const info = await BlueElectrum.getConfirmedBlockHeight(txid);
+    assert.ok(info !== null && info.height > 0 && info.tip >= info.height);
+  });
 });

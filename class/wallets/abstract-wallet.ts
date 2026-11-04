@@ -124,14 +124,13 @@ export class AbstractWallet {
    * @returns {number} Available to spend amount, int, in sats
    */
   getBalance(): number {
-    return this.balance + (this.getUnconfirmedBalance() < 0 ? this.getUnconfirmedBalance() : 0);
+    const unconfirmed = this.getUnconfirmedBalance();
+    return this.balance + (unconfirmed < 0 ? unconfirmed : 0);
   }
 
   getPreferredBalanceUnit(): DoichainUnit {
-    for (const value of Object.values(DoichainUnit)) {
-      if (value === this.preferredBalanceUnit) {
-        return this.preferredBalanceUnit;
-      }
+    if (Object.values(DoichainUnit).includes(this.preferredBalanceUnit)) {
+      return this.preferredBalanceUnit;
     }
     return DoichainUnit.DOI;
   }
@@ -256,7 +255,7 @@ export class AbstractWallet {
       const xpub = this.secret.substring(xpubIndex).replace(/[()]/g, '').split('/')[0];
 
       const pathIndex = fpAndPath.indexOf('/');
-      const path = 'm' + fpAndPath.substring(pathIndex).replace(/h/g, "'");
+      const path = 'm' + fpAndPath.substring(pathIndex).replace(/[hH‘’]/g, "'");
       const fp = fpAndPath.substring(0, pathIndex);
 
       this._derivationPath = path;
@@ -286,7 +285,8 @@ export class AbstractWallet {
     const m = this.secret.match(re);
     if (m && m.length === 3) {
       let [hexFingerprint, ...derivationPathArray] = m[1].split('/');
-      const derivationPath = `m/${derivationPathArray.join('/').replace(/h/g, "'")}`;
+      // H is the same hardened bit as h; leaving it skips xpub to zpub and imports BIP84 as legacy 1...
+      const derivationPath = `m/${derivationPathArray.join('/').replace(/[hH‘’]/g, "'")}`;
       if (hexFingerprint.length === 8) {
         hexFingerprint = uint8ArrayToHex(hexToUint8Array(hexFingerprint).reverse());
         this.masterFingerprint = parseInt(hexFingerprint, 16);
@@ -331,7 +331,7 @@ export class AbstractWallet {
         }
         if (parsedSecret.keystore.derivation) {
           this._derivationPath = parsedSecret.keystore.derivation;
-          this._derivationPath = this._derivationPath?.replace(/h/g, "'");
+          this._derivationPath = this._derivationPath?.replace(/[hH‘’]/g, "'");
         }
         this.secret = parsedSecret.keystore.xpub;
         this.masterFingerprint = masterFingerprint;
@@ -420,11 +420,11 @@ export class AbstractWallet {
   }
 
   getAddressAsync(): Promise<string | false | undefined> {
-    return new Promise(resolve => resolve(this.getAddress()));
+    return Promise.resolve(this.getAddress());
   }
 
   async getChangeAddressAsync(): Promise<string | false | undefined> {
-    return new Promise(resolve => resolve(this.getAddress()));
+    return Promise.resolve(this.getAddress());
   }
 
   useWithHardwareWalletEnabled(): boolean {
@@ -524,7 +524,7 @@ export class AbstractWallet {
   }
 
   getMasterFingerprintFromHex(hexValue: string): number {
-    if (hexValue.length < 8) hexValue = '0' + hexValue;
+    hexValue = hexValue.padStart(8, '0');
     const b = hexToUint8Array(hexValue);
     if (b.length !== 4) throw new Error('invalid fingerprint hex');
 

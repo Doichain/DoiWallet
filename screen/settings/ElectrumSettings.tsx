@@ -1,6 +1,6 @@
-import { RouteProp, useRoute } from '@react-navigation/native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Keyboard, Platform, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useNavigation, RouteProp, useRoute } from '@react-navigation/native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Dimensions, Keyboard, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import DefaultPreference from 'react-native-default-preference';
 
 import * as BlueElectrum from '../../blue_modules/BlueElectrum';
@@ -18,18 +18,16 @@ import {
 } from '../../components/DoneAndDismissKeyboardInputAccessory';
 import HeaderMenuButton from '../../components/HeaderMenuButton';
 import {
-  SettingsScrollView,
   SettingsSection,
-  SettingsSectionHeader,
-  SettingsCard,
   SettingsListItem,
-  SettingsSubtitle,
-  isAndroid,
-} from '../../components/platform';
+  SettingsScrollView,
+  SettingsFootnote,
+  settingsCardContent,
+} from '../../components/SettingsSection';
 import { useTheme } from '../../components/themes';
 import { Action } from '../../components/types';
 import { useSettings } from '../../hooks/context/useSettings';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
+import { useKeyboard } from '../../hooks/useKeyboard';
 import loc from '../../loc';
 import { DetailViewStackParamList } from '../../navigation/DetailViewStackParamList';
 import { CommonToolTipActions } from '../../typings/CommonToolTipActions';
@@ -43,13 +41,12 @@ export interface ElectrumServerItem {
 }
 
 const SET_PREFERRED_PREFIX = 'set_preferred_';
-const horizontalPadding = isAndroid ? 20 : 16;
 
 const ElectrumSettings: React.FC = () => {
   const { colors } = useTheme();
   const params = useRoute<RouteProps>().params;
   const { server } = params;
-  const navigation = useExtendedNavigation();
+  const navigation = useNavigation();
   const [isLoading, setIsLoading] = useState(true);
   const [serverHistory, setServerHistory] = useState<Set<ElectrumServerItem>>(new Set());
   const [config, setConfig] = useState<{ connected?: number; host?: string; port?: string }>({});
@@ -60,6 +57,59 @@ const ElectrumSettings: React.FC = () => {
   const [isAndroidNumericKeyboardFocused, setIsAndroidNumericKeyboardFocused] = useState(false);
   const [isAndroidAddressKeyboardVisible, setIsAndroidAddressKeyboardVisible] = useState(false);
   const { setIsElectrumDisabled, isElectrumDisabled } = useSettings();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const hostInputRef = useRef<View>(null);
+  const portInputRef = useRef<View>(null);
+  const focusedFieldRef = useRef<'host' | 'port' | null>(null);
+  const scrollYRef = useRef<number>(0);
+
+  const { height: keyboardHeight, isVisible: isKeyboardVisible } = useKeyboard();
+  const androidKeyboardInset = Platform.OS === 'android' && isKeyboardVisible ? keyboardHeight + 24 : 0;
+
+  const scrollFocusedFieldIntoView = useCallback(
+    (field?: 'host' | 'port') => {
+      if (Platform.OS !== 'android') return;
+      if (field) {
+        focusedFieldRef.current = field;
+      }
+      const targetField = focusedFieldRef.current;
+      if (!targetField || keyboardHeight <= 0) return;
+
+      const targetRef = targetField === 'host' ? hostInputRef : portInputRef;
+      if (!targetRef.current) return;
+
+      const onMeasure = (pageY: number, height: number) => {
+        const windowHeight = Dimensions.get('window').height;
+        const keyboardTop = windowHeight - keyboardHeight;
+        const inputBottom = pageY + height;
+        if (inputBottom > keyboardTop) {
+          const overlap = inputBottom - keyboardTop;
+          const targetScrollY = scrollYRef.current + overlap;
+          scrollViewRef.current?.scrollTo({ y: targetScrollY, animated: true });
+        } else if (pageY < 0) {
+          const targetScrollY = Math.max(0, scrollYRef.current + pageY);
+          scrollViewRef.current?.scrollTo({ y: targetScrollY, animated: true });
+        }
+      };
+
+      if (targetRef.current.measureInWindow) {
+        targetRef.current.measureInWindow((_x, y, _width, height) => {
+          onMeasure(y, height);
+        });
+      } else if (targetRef.current.measure) {
+        targetRef.current.measure((_x, _y, _width, height, _pageX, pageY) => {
+          onMeasure(pageY, height);
+        });
+      }
+    },
+    [keyboardHeight],
+  );
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && isKeyboardVisible && keyboardHeight > 0) {
+      scrollFocusedFieldIntoView();
+    }
+  }, [isKeyboardVisible, keyboardHeight, scrollFocusedFieldIntoView]);
   const [savedServer, setSavedServer] = useState<{ host: string; tcp: string; ssl: string }>({
     host: '',
     tcp: '',
@@ -407,11 +457,14 @@ const ElectrumSettings: React.FC = () => {
     [onPressMenuItem, generateToolTipActions],
   );
 
+  const renderHeaderRight = useCallback(() => HeaderRight, [HeaderRight]);
+
   useEffect(() => {
+    const nextHeaderRight = isElectrumDisabled ? null : renderHeaderRight;
     navigation.setOptions({
-      headerRight: isElectrumDisabled ? null : () => HeaderRight,
+      headerRight: nextHeaderRight,
     });
-  }, [HeaderRight, isElectrumDisabled, navigation]);
+  }, [isElectrumDisabled, navigation, renderHeaderRight]);
 
   const checkServer = async () => {
     setIsLoading(true);
@@ -482,90 +535,106 @@ const ElectrumSettings: React.FC = () => {
   const renderElectrumSettings = () => {
     return (
       <>
-        <SettingsSectionHeader title={loc.settings.electrum_status} />
-        <SettingsSection compact>
-          <SettingsCard>
-            <View style={styles.cardContent}>
-              <View style={styles.connectWrap}>
-                <View style={[styles.container, config.connected === 1 ? stylesHook.containerConnected : stylesHook.containerDisconnected]}>
-                  <Text
-                    style={[styles.textConnectionStatus, config.connected === 1 ? stylesHook.textConnected : stylesHook.textDisconnected]}
-                  >
-                    {config.connected === 1 ? loc.settings.electrum_connected : loc.settings.electrum_connected_not}
-                  </Text>
-                </View>
+        <SettingsSection title={loc.settings.electrum_status}>
+          <View style={settingsCardContent}>
+            <View style={styles.connectWrap}>
+              <View style={[styles.container, config.connected === 1 ? stylesHook.containerConnected : stylesHook.containerDisconnected]}>
+                <Text
+                  style={[styles.textConnectionStatus, config.connected === 1 ? stylesHook.textConnected : stylesHook.textDisconnected]}
+                >
+                  {config.connected === 1 ? loc.settings.electrum_connected : loc.settings.electrum_connected_not}
+                </Text>
               </View>
-              <Text style={[styles.hostname, stylesHook.hostname]} onPress={checkServer} selectable>
-                {config.host}:{config.port}
-              </Text>
-
-              {serverBanner.length > 0 && <Text style={[styles.bannerText, stylesHook.bannerText]}>{serverBanner}</Text>}
             </View>
-          </SettingsCard>
+            <Text style={[styles.hostname, stylesHook.hostname]} onPress={checkServer} selectable>
+              {config.host}:{config.port}
+            </Text>
+
+            {serverBanner.length > 0 && <Text style={[styles.bannerText, stylesHook.bannerText]}>{serverBanner}</Text>}
+          </View>
         </SettingsSection>
 
-        <SettingsSectionHeader title={loc.settings.electrum_preferred_server} />
-        <SettingsSection compact>
-          <SettingsCard>
-            <View style={styles.cardContent}>
-              <SettingsSubtitle>{loc.settings.electrum_preferred_server_description}</SettingsSubtitle>
+        <SettingsSection title={loc.settings.electrum_preferred_server}>
+          <View style={settingsCardContent}>
+            <SettingsFootnote>{loc.settings.electrum_preferred_server_description}</SettingsFootnote>
 
-              <View style={styles.inputGroupSpacing}>
-                <AddressInput
-                  testID="HostInput"
-                  placeholder={loc.formatString(loc.settings.electrum_host, { example: '10.20.30.40' })}
-                  address={host}
-                  onChangeText={text => setHost(text.trim())}
-                  editable={!isLoading}
-                  keyboardType="default"
-                  onBlur={() => setIsAndroidAddressKeyboardVisible(false)}
-                  onFocus={() => setIsAndroidAddressKeyboardVisible(true)}
-                  inputAccessoryViewID={DoneAndDismissKeyboardInputAccessoryViewID}
-                  isLoading={isLoading}
-                />
-              </View>
-
-              <View style={styles.portWrap}>
-                <View style={[styles.inputWrap, stylesHook.inputWrap]}>
-                  <TextInput
-                    placeholder={loc.formatString(loc.settings.electrum_port, { example: '50001' })}
-                    value={sslPort?.toString() === '' || sslPort === undefined ? port?.toString() || '' : sslPort?.toString() || ''}
-                    onChangeText={text => {
-                      const parsed = Number(text.trim());
-                      if (Number.isNaN(parsed)) {
-                        sslPort === undefined ? setPort(undefined) : setSslPort(undefined);
-                        return;
-                      }
-                      sslPort === undefined ? setPort(parsed) : setSslPort(parsed);
-                    }}
-                    numberOfLines={1}
-                    style={[styles.inputText, stylesHook.inputText]}
-                    editable={!isLoading}
-                    placeholderTextColor="#81868e"
-                    underlineColorAndroid="transparent"
-                    autoCorrect={false}
-                    autoCapitalize="none"
-                    keyboardType="number-pad"
-                    inputAccessoryViewID={DismissKeyboardInputAccessoryViewID}
-                    testID="PortInput"
-                    onFocus={() => setIsAndroidNumericKeyboardFocused(true)}
-                    onBlur={() => setIsAndroidNumericKeyboardFocused(false)}
-                  />
-                </View>
-                <Text style={[styles.usePort, stylesHook.usePort]}>{loc.settings.use_ssl}</Text>
-                <Switch
-                  testID="SSLPortInput"
-                  value={sslPort !== undefined}
-                  onValueChange={onSSLPortChange}
-                  disabled={host?.endsWith('.onion') || isLoading || host === '' || (port === undefined && sslPort === undefined)}
-                />
-              </View>
-
-              <View style={styles.buttonContainer}>
-                <Button disabled={saveDisabled} testID="Save" onPress={save} title={loc.settings.save} />
-              </View>
+            <View ref={hostInputRef} style={styles.inputGroupSpacing}>
+              <AddressInput
+                testID="HostInput"
+                placeholder={loc.formatString(loc.settings.electrum_host, { example: '10.20.30.40' })}
+                address={host}
+                onChangeText={text => setHost(text.trim())}
+                editable={!isLoading}
+                keyboardType="default"
+                onBlur={() => {
+                  if (focusedFieldRef.current === 'host') {
+                    focusedFieldRef.current = null;
+                  }
+                  setIsAndroidAddressKeyboardVisible(false);
+                }}
+                onFocus={() => {
+                  focusedFieldRef.current = 'host';
+                  setIsAndroidAddressKeyboardVisible(true);
+                  if (Platform.OS === 'android' && isKeyboardVisible && keyboardHeight > 0) {
+                    scrollFocusedFieldIntoView('host');
+                  }
+                }}
+                inputAccessoryViewID={DoneAndDismissKeyboardInputAccessoryViewID}
+                isLoading={isLoading}
+              />
             </View>
-          </SettingsCard>
+
+            <View style={styles.portWrap}>
+              <View ref={portInputRef} style={[styles.inputWrap, stylesHook.inputWrap]}>
+                <TextInput
+                  placeholder={loc.formatString(loc.settings.electrum_port, { example: '50001' })}
+                  value={sslPort?.toString() === '' || sslPort === undefined ? port?.toString() || '' : sslPort?.toString() || ''}
+                  onChangeText={text => {
+                    const parsed = Number(text.trim());
+                    if (Number.isNaN(parsed)) {
+                      sslPort === undefined ? setPort(undefined) : setSslPort(undefined);
+                      return;
+                    }
+                    sslPort === undefined ? setPort(parsed) : setSslPort(parsed);
+                  }}
+                  numberOfLines={1}
+                  style={[styles.inputText, stylesHook.inputText]}
+                  editable={!isLoading}
+                  placeholderTextColor="#81868e"
+                  underlineColorAndroid="transparent"
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                  keyboardType="number-pad"
+                  inputAccessoryViewID={DismissKeyboardInputAccessoryViewID}
+                  testID="PortInput"
+                  onFocus={() => {
+                    focusedFieldRef.current = 'port';
+                    setIsAndroidNumericKeyboardFocused(true);
+                    if (Platform.OS === 'android' && isKeyboardVisible && keyboardHeight > 0) {
+                      scrollFocusedFieldIntoView('port');
+                    }
+                  }}
+                  onBlur={() => {
+                    if (focusedFieldRef.current === 'port') {
+                      focusedFieldRef.current = null;
+                    }
+                    setIsAndroidNumericKeyboardFocused(false);
+                  }}
+                />
+              </View>
+              <Text style={[styles.usePort, stylesHook.usePort]}>{loc.settings.use_ssl}</Text>
+              <Switch
+                testID="SSLPortInput"
+                value={sslPort !== undefined}
+                onValueChange={onSSLPortChange}
+                disabled={host?.endsWith('.onion') || isLoading || host === '' || (port === undefined && sslPort === undefined)}
+              />
+            </View>
+
+            <View style={styles.buttonContainer}>
+              <Button disabled={saveDisabled} testID="Save" onPress={save} title={loc.settings.save} />
+            </View>
+          </View>
         </SettingsSection>
 
         {Platform.select({
@@ -602,13 +671,19 @@ const ElectrumSettings: React.FC = () => {
 
   return (
     <SettingsScrollView
+      ref={scrollViewRef}
       keyboardShouldPersistTaps="always"
       automaticallyAdjustContentInsets
       contentInsetAdjustmentBehavior="automatic"
-      automaticallyAdjustKeyboardInsets
+      automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+      floatingButtonHeight={androidKeyboardInset}
+      onScroll={event => {
+        scrollYRef.current = event.nativeEvent.contentOffset.y;
+      }}
+      scrollEventThrottle={16}
       testID="ElectrumSettingsScrollView"
     >
-      <SettingsSection horizontalInset={false}>
+      <SettingsSection>
         <SettingsListItem
           title={loc.settings.electrum_offline_mode}
           subtitle={loc.settings.electrum_offline_description}
@@ -617,20 +692,15 @@ const ElectrumSettings: React.FC = () => {
             value: isElectrumDisabled,
             testID: 'ElectrumConnectionEnabledSwitch',
           }}
-          position="single"
+          bottomDivider={false}
         />
       </SettingsSection>
-
       {!isElectrumDisabled && renderElectrumSettings()}
     </SettingsScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  cardContent: {
-    paddingHorizontal: horizontalPadding,
-    paddingVertical: isAndroid ? 12 : 10,
-  },
   connectWrap: {
     width: 'auto',
     height: 34,
@@ -663,7 +733,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: isAndroid ? 12 : 10,
+    marginTop: 12,
   },
   inputText: {
     flex: 1,
@@ -678,16 +748,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 14,
   },
   inputGroupSpacing: {
-    marginTop: isAndroid ? 12 : 10,
+    marginTop: 12,
   },
   buttonContainer: {
-    marginTop: isAndroid ? 12 : 10,
+    marginTop: 12,
   },
   bannerText: {
-    marginTop: isAndroid ? 16 : 12,
+    marginTop: 16,
     alignSelf: 'center',
     fontFamily: 'monospace',
-    marginBottom: isAndroid ? 4 : 2,
+    marginBottom: 4,
   },
 });
 

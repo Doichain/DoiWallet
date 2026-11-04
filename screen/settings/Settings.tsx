@@ -1,99 +1,78 @@
+import { useNavigation } from '@react-navigation/native';
 import React, { useLayoutEffect } from 'react';
-import { Platform } from 'react-native';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import loc from '../../loc';
-import { SettingsScrollView, SettingsSection, SettingsListItem, getSettingsHeaderOptions } from '../../components/platform';
+import { SettingsSection, SettingsListItem, SettingsScrollView } from '../../components/SettingsSection';
 import { useSettings } from '../../hooks/context/useSettings';
-import { useTheme } from '../../components/themes';
 
 const Settings = () => {
-  const { navigate, setOptions } = useExtendedNavigation();
+  const { navigate, setOptions } = useNavigation();
   const { language } = useSettings(); // Subscribe to language changes to trigger re-render
-  const { colors, dark } = useTheme();
-  const isIOSLightMode = Platform.OS === 'ios' && !dark;
-  const settingsCardColor = colors.lightButton ?? colors.modal ?? colors.elevated ?? colors.background;
-  const settingsScreenBackgroundColor = isIOSLightMode ? settingsCardColor : colors.background;
-  const settingsListItemBackgroundColor = isIOSLightMode ? colors.background : undefined;
   useLayoutEffect(() => {
-    setOptions(getSettingsHeaderOptions(loc.settings.header, { ...colors, background: settingsScreenBackgroundColor }, dark));
-  }, [setOptions, language, colors, settingsScreenBackgroundColor, dark]); // Include language to trigger re-render when language changes
+    // Only the title needs refreshing on language change; header styling comes from the route options
+    setOptions({ title: loc.settings.header });
+  }, [setOptions, language]);
 
   return (
-    <SettingsScrollView testID="SettingsRoot" style={{ backgroundColor: settingsScreenBackgroundColor }}>
+    <SettingsScrollView testID="SettingsRoot">
       {/* no Donate item: it went to BlueWallet's donation page */}
-      <SettingsSection horizontalInset={false}>
+      <SettingsSection>
         <SettingsListItem
           title={loc.settings.general}
           iconName="settings"
           onPress={() => navigate('GeneralSettings')}
           testID="GeneralSettings"
           chevron
-          position="first"
-          itemBackgroundColor={settingsListItemBackgroundColor}
         />
-
         <SettingsListItem
           title={loc.settings.currency}
           iconName="currency"
           onPress={() => navigate('Currency')}
           testID="Currency"
           chevron
-          position="middle"
-          itemBackgroundColor={settingsListItemBackgroundColor}
         />
-
         <SettingsListItem
           title={loc.settings.language}
           iconName="language"
           onPress={() => navigate('Language')}
           testID="Language"
           chevron
-          position="middle"
-          itemBackgroundColor={settingsListItemBackgroundColor}
         />
-
         <SettingsListItem
           title={loc.settings.encrypt_title}
           iconName="security"
           onPress={() => navigate('EncryptStorage')}
           testID="SecurityButton"
           chevron
-          position="middle"
-          itemBackgroundColor={settingsListItemBackgroundColor}
         />
-
         <SettingsListItem
           title={loc.settings.network}
           iconName="network"
           onPress={() => navigate('NetworkSettings')}
           testID="NetworkSettings"
           chevron
-          position="last"
-          itemBackgroundColor={settingsListItemBackgroundColor}
+          bottomDivider={false}
         />
       </SettingsSection>
 
-      <SettingsSection horizontalInset={false}>
+      <SettingsSection>
         <SettingsListItem
           title={loc.settings.tools}
           iconName="tools"
           onPress={() => navigate('SettingsTools')}
           testID="Tools"
           chevron
-          position="single"
-          itemBackgroundColor={settingsListItemBackgroundColor}
+          bottomDivider={false}
         />
       </SettingsSection>
 
-      <SettingsSection horizontalInset={false}>
+      <SettingsSection>
         <SettingsListItem
           title={loc.settings.about}
           iconName="about"
           onPress={() => navigate('About')}
           testID="AboutButton"
           chevron
-          position="single"
-          itemBackgroundColor={settingsListItemBackgroundColor}
+          bottomDivider={false}
         />
       </SettingsSection>
     </SettingsScrollView>

@@ -1,11 +1,11 @@
+import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { Platform } from 'react-native';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import loc from '../../loc';
-import { SettingsScrollView, SettingsSection, SettingsListItem } from '../../components/platform';
+import { SettingsSection, SettingsListItem, SettingsScrollView } from '../../components/SettingsSection';
 
 const NetworkSettings: React.FC = () => {
-  const navigation = useExtendedNavigation();
+  const navigation = useNavigation();
   const isNotificationsCapable = Platform.OS !== 'web';
   const navigateToElectrumSettings = () => {
     navigation.navigate('ElectrumSettings');
@@ -21,26 +21,25 @@ const NetworkSettings: React.FC = () => {
 
   return (
     <SettingsScrollView>
-      <SettingsSection horizontalInset={false}>
+      <SettingsSection>
         <SettingsListItem
           title={loc.settings.block_explorer}
           iconName="blockExplorer"
           onPress={navigateToBlockExplorerSettings}
           testID="BlockExplorerSettings"
           chevron
-          position="first"
         />
 
-        {/* no Lightning settings: this fork has no Lightning wallet */}
         <SettingsListItem
           title={loc.settings.network_electrum}
           iconName="electrum"
           onPress={navigateToElectrumSettings}
           testID="ElectrumSettings"
           chevron
-          position={isNotificationsCapable ? 'middle' : 'last'}
+          bottomDivider={isNotificationsCapable}
         />
 
+        {/* no Lightning settings: this fork has no Lightning wallet */}
         {isNotificationsCapable && (
           <SettingsListItem
             title={loc.settings.notifications}
@@ -48,7 +47,7 @@ const NetworkSettings: React.FC = () => {
             onPress={navigateToNotificationSettings}
             testID="NotificationSettings"
             chevron
-            position="last"
+            bottomDivider={false}
           />
         )}
       </SettingsSection>

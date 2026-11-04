@@ -2,7 +2,6 @@
   "_": {
     "bad_password": "Cyfrinair anghywir. Tria eto. ",
     "cancel": "Canslo",
-    "continue": "Parhau",
     "clipboard": "Clipfwrdd",
     "copied": "Wedi'i gopïo!",
     "discard_changes": "Gwaredu newidiadau?",
@@ -56,6 +55,7 @@
     "expired": "Wedi dod i ben",
     "payment": "Taliad"
   },
+  "lndViewInvoice": {},
   "plausibledeniability": {
     "create_fake_storage": "Creu storfa wedi'i hamgryptio",
     "create_password_explanation": "Ni ddyliai'r cyfrinair ar gyfer y storfa ffug fod yr un cyfrinair ag ar gyfer y brif storfa",
@@ -75,9 +75,10 @@
     "title": "Mae dy waled wedi cael ei chreu."
   },
   "receive": {
-    "details_create": "Creu",
+    "details_save": "Safio",
     "details_label": "Disgrifiad",
     "details_setAmount": "Derbyn efo swm",
+    "option_label": "Label",
     "details_share": "Rhannu...",
     "address_not_found": "Methu cynhyrchu cyfeiriad derbyn.",
     "header": "Derbyn",
@@ -142,6 +143,8 @@
     "dynamic_prev": "Blaenorol",
     "dynamic_start": "Dechrau",
     "dynamic_stop": "Stopio",
+    "fee_10m": "10m",
+    "fee_1d": "1d",
     "fee_3h": "3a",
     "fee_custom": "Arbennig",
     "insert_custom_fee": "Mewnosod ffi",
@@ -159,8 +162,6 @@
     "psbt_sign": "Arwyddo trafodyn",
     "invalid_psbt": "PSBT annilys.",
     "open_settings": "Agor Gosodiadau",
-    "permission_storage_denied_message": "Mae BlueWallet yn methu safio'r ffeil hon. Agor gosodiadau dy ddyfais a galluogi Caniatâd Storfa.",
-    "permission_storage_title": "Caniatâd Mynediad Storfa",
     "psbt_clipboard": "Copïo i'r Clipfwrdd",
     "psbt_this_is_psbt": "Dyma Drafodyn Bitcoin wedi'i Lofnodi'n Rhannol (PSBT). Cwblha'r llofnodi efo dy waled caledwedd.",
     "psbt_tx_export": "Allforio i ffeil",
@@ -172,14 +173,10 @@
     "reset_amount": "Ailosod Swm",
     "reset_amount_confirm": "A hoffet ailosod y swm?",
     "success_done": "Wedi Cwblhau",
-    "txSaved": "Mae'r ffeil trafodyn ({filePath}) wedi'i safio.",
-    "file_saved_at_path": "Mae'r ffeil ({filePath}) wedi'i safio.",
     "cant_send_to_silentpayment_adress": "Ni all y waled hon anfon at gyfeiriadau Silent Payments",
     "cant_send_to_bip47": "Ni all y waled hon anfon at godau taliad BIP47",
     "cant_find_bip47_notification": "Adia'r Cod Taliad hwn at gysylltiadau yn gyntaf",
-    "problem_with_psbt": "Problem efo'r PSBT",
-    "fee_10m": "10m",
-    "fee_1d": "1d"
+    "problem_with_psbt": "Problem efo'r PSBT"
   },
   "settings": {
     "about": "Amdano",
@@ -247,7 +244,6 @@
     "general": "Cyffredinol",
     "general_continuity": "Parhad",
     "general_continuity_e": "Pan fydd wedi'i alluogi, byddi'n gallu gweld waledi a thrafodion dethol gan ddefnyddio dy ddyfeisiau Apple iCloud eraill sydd wedi'u cysylltu.",
-    "groundcontrol_explanation": "Mae GroundControl yn weinydd hysbysiadau gwthio rhad ac am ddim, cod-agored ar gyfer waledi Bitcoin. Gelli osod dy weinydd GroundControl dy hun a rhoi ei URL yma er mwyn peidio â dibynnu ar seilwaith BlueWallet. Gad yn wag i ddefnyddio gweinydd diofyn GroundControl.",
     "header": "Gosodiadau",
     "language": "Iaith",
     "last_updated": "Diweddarwyd ddiwethaf",
@@ -257,7 +253,6 @@
     "network_broadcast": "Darlledu Trafodyn",
     "network_electrum": "Gweinydd Electrum",
     "electrum_suggested_description": "Pan na fydd gweinydd dewisol wedi'i osod, dewisir gweinydd awgrymedig ar hap.",
-    "not_a_valid_uri": "URI annilys",
     "notifications": "Hysbysiadau",
     "open_link_in_explorer": "Agor dolen yn yr archwiliwr",
     "password": "Cyfrinair",
@@ -275,12 +270,12 @@
     "push_notifications_explanation": "Drwy alluogi hysbysiadau, bydd tocyn dy ddyfais yn cael ei anfon at y gweinydd, ynghyd â chyfeiriadau waled a IDs trafodion ar gyfer pob waled a thrafodyn a wnaed ar ôl galluogi hysbysiadau. Defnyddir tocyn y ddyfais i anfon hysbysiadau, ac mae gwybodaeth y waled yn caniatáu i ni dy hysbysu am Bitcoin sy'n dod i mewn neu gadarnhad trafodion.\n\nDim ond gwybodaeth o ar ôl iti alluogi hysbysiadau a drosglwyddir—ni chesglir unrhyw beth o cyn hynny.\n\nBydd analluogi hysbysiadau yn gwaredu'r holl wybodaeth hon o'r gweinydd. Yn ogystal, bydd dileu waled o'r ap hefyd yn gwaredu ei gwybodaeth gysylltiedig o'r gweinydd.",
     "selfTest": "Hunan-brawf",
     "save": "Safio",
-    "saved": "Wedi Safio",
     "success_transaction_broadcasted": "Mae dy drafodyn wedi'i ddarlledu'n llwyddiannus!",
     "total_balance": "Balans Llawn",
     "total_balance_explanation": "Dangos cyfanswm balans pob un o'th waledi ar dy declyn sgrin gartref.",
     "widgets": "Teclynnau",
     "tools": "Offer",
+    "groundcontrol_explanation": "Mae GroundControl yn weinydd hysbysiadau gwthio rhad ac am ddim, cod-agored ar gyfer waledi Bitcoin. Gelli osod dy weinydd GroundControl dy hun a rhoi ei URL yma er mwyn peidio â dibynnu ar seilwaith BlueWallet. Gad yn wag i ddefnyddio gweinydd diofyn GroundControl.",
     "default_wallets": "Gweld Pob Waled"
   },
   "notifications": {
@@ -321,7 +316,6 @@
     "onchain": "Ar y gadwyn",
     "details_to": "Allbwn",
     "enable_offline_signing": "Nid yw'r waled hon yn cael ei defnyddio ar y cyd â llofnodi all-lein. A hoffet ei alluogi nawr?",
-    "list_conf": "Cad: {number}",
     "pending": "Disgwyl",
     "pending_with_amount": "Yn aros {amt1} ({amt2})",
     "received_with_amount": "+{amt1} ({amt2})",
@@ -341,14 +335,13 @@
     "updating": "Diweddaru...",
     "watchOnlyWarningTitle": "Rhybudd diogelwch",
     "watchOnlyWarningDescription": "Bydd yn ofalus o dwyllwyr sy'n aml yn defnyddio waledi “gwylio'n unig” i dwyllo defnyddwyr. Nid yw'r waledi hyn yn caniatáu iti reoli na anfon cyllid; dim ond y balans y maent yn caniatáu iti ei weld.",
-    "custom_fee_warning_title": "Rhybudd",
-    "custom_fee_warning_description": "Mae ffioedd o dan 1 sat/vB yn ddilys, ond efallai na chânt eu hailddarlledu oherwydd polisïau nodau.",
     "details_eta_analyzing": "Dadansoddi...",
     "details_sent": "Anfonwyd",
     "details_section": "Manylion",
     "details_explorer": "archwiliwr",
     "details_network_fee": "Ffi Rhwydwaith",
     "details_to_address": "At",
+    "details_id": "ID",
     "details_note": "Nodyn",
     "details_add_note": "adio",
     "details_advanced": "Arbenigol",
@@ -357,8 +350,7 @@
     "details_virtual_size": "Maint rhithwir",
     "details_tx_hex": "Hex y Trafodyn",
     "details_inputs_count": "Mewnbynau ({count})",
-    "details_outputs_count": "Allbynau ({count})",
-    "details_id": "ID"
+    "details_outputs_count": "Allbynau ({count})"
   },
   "wallets": {
     "add_bitcoin": "Bitcoin",
@@ -369,9 +361,7 @@
     "add_entropy_reset_message": "Bydd newid math y waled yn ailosod yr entropi cyfredol. Wyt ti eisiau parhau?",
     "add_entropy": "Entropi",
     "add_entropy_bytes": "{bytes} beit o entropi",
-    "add_entropy_generated": "{gen} beit o entropi a gynhyrchwyd",
     "add_entropy_provide": "Darparu entropi drwy rolio dis",
-    "add_entropy_remain": "{gen} beit o entropi a gynhyrchwyd. Bydd y {rem} beit sy'n weddill yn cael eu cael o gynhyrchydd rhifau ar hap y System.",
     "add_import_wallet": "Mewnforio waled",
     "add_lightning": "Mellten",
     "add_lightning_explain": "Er mwyn gwario yn syth",
@@ -394,12 +384,14 @@
     "details_delete_wallet": "Gwaredu Waled",
     "details_derivation_path": "llwybr deilliant",
     "details_display": "Dangos ar y Sgrin Gartref",
+    "details_edit": "golygu",
     "details_export_backup": "Allforio/Copi wrth gefn",
-    "details_export_history": "Allforio Hanes i CSV",
     "details_master_fingerprint": "Ôl Bys y Brif Allwedd",
     "details_multisig_type": "aml-lofnod",
+    "details_options": "Opsiynau",
     "details_show_xpub": "Dangos xpub y Waled",
     "details_show_addresses": "Dangos cyfeiriadau",
+    "details_stats_coins": "Darnau arian",
     "details_title": "Waled",
     "wallets": "Waledi",
     "swipe_balance_hide": "Cuddio",
@@ -467,8 +459,10 @@
     "xpub_title": "xpub y Waled",
     "manage_wallets_search_placeholder": "Chwilio waledi, cyfeiriadau, trafodion a nodion",
     "more_info": "Mwy o Wybodaeth",
-    "details_delete_wallet_error_message": "Cafwyd problem wrth gadarnhau a oedd y waled hon wedi'i gwaredu o'r hysbysiadau—gallai hyn fod oherwydd problem rhwydwaith neu gysylltiad gwael. Os byddi'n parhau, gallet dal i dderbyn hysbysiadau am drafodion sy'n gysylltiedig â'r waled hon, hyd yn oed ar ôl ei dileu.",
-    "details_delete_anyway": "Dileu beth bynnag"
+    "add_entropy_generated": "{gen} beit o entropi a gynhyrchwyd",
+    "add_entropy_remain": "{gen} beit o entropi a gynhyrchwyd. Bydd y {rem} beit sy'n weddill yn cael eu cael o gynhyrchydd rhifau ar hap y System.",
+    "details_export_history": "Allforio Hanes i CSV",
+    "details_delete_wallet_error_message": "Cafwyd problem wrth gadarnhau a oedd y waled hon wedi'i gwaredu o'r hysbysiadau—gallai hyn fod oherwydd problem rhwydwaith neu gysylltiad gwael. Os byddi'n parhau, gallet dal i dderbyn hysbysiadau am drafodion sy'n gysylltiedig â'r waled hon, hyd yn oed ar ôl ei dileu."
   },
   "total_balance_view": {
     "display_in_bitcoin": "Dangos mewn Bitcoin",
@@ -586,9 +580,9 @@
     "sort_desc": "Disgynnol",
     "sort_height": "Uchder",
     "sort_value": "Gwerth",
+    "sort_label": "Label",
     "sort_status": "Statws",
-    "sort_by": "Trefnu yn ôl",
-    "sort_label": "Label"
+    "sort_by": "Trefnu yn ôl"
   },
   "units": {
     "MAX": "MAX",

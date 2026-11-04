@@ -1,4 +1,5 @@
 import { Psbt } from '@doichain/doichainjs-lib';
+import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { CreateTransactionTarget, CreateTransactionUtxo, TWallet, Utxo } from '../class/wallets/types';
 import { DoichainUnit, Chain } from '../models/doichainUnits';
 import { ScanQRCodeParamList } from './DetailViewStackParamList';
@@ -19,6 +20,21 @@ export interface NameOpParams {
    */
   nameOutpoint?: { txid: string; vout: number };
 }
+type HeaderRightRenderer = NonNullable<NativeStackNavigationOptions['headerRight']>;
+
+export const CoinControlSortDirection = {
+  ASC: 'asc',
+  DESC: 'desc',
+} as const;
+export type CoinControlSortDirection = (typeof CoinControlSortDirection)[keyof typeof CoinControlSortDirection];
+
+export const CoinControlSortType = {
+  HEIGHT: 'height',
+  LABEL: 'label',
+  VALUE: 'value',
+  FROZEN: 'frozen',
+} as const;
+export type CoinControlSortType = (typeof CoinControlSortType)[keyof typeof CoinControlSortType];
 
 export type SendDetailsParams = {
   transactionMemo?: string;
@@ -60,7 +76,9 @@ export type TNavigationWrapper = {
 };
 
 export type SendDetailsStackParamList = {
-  SendDetails: SendDetailsParams;
+  SendDetails: SendDetailsParams & {
+    headerRight?: HeaderRightRenderer;
+  };
   CoinControlOutput: {
     walletID: string;
     utxo: Utxo;
@@ -87,6 +105,7 @@ export type SendDetailsStackParamList = {
     satoshiPerByte: number;
     payjoinUrl?: string | null;
     psbt: Psbt;
+    headerRight?: HeaderRightRenderer;
   };
   PsbtWithHardwareWallet: {
     memo?: string;
@@ -96,6 +115,9 @@ export type SendDetailsStackParamList = {
     txhex?: string;
     deepLinkPSBT?: string;
     onBarScanned?: string;
+  };
+  PsbtRaw: {
+    psbtBase64: string;
   };
   CreateTransaction: {
     memo?: string;
@@ -108,6 +130,7 @@ export type SendDetailsStackParamList = {
     recipients: CreateTransactionTarget[];
     satoshiPerByte: number;
     feeSatoshi?: number;
+    headerRight?: HeaderRightRenderer;
   };
   PsbtMultisig: {
     memo?: string;
@@ -129,6 +152,8 @@ export type SendDetailsStackParamList = {
     amountUnit?: DoichainUnit;
     txid?: string;
     invoiceDescription?: string;
+    walletID?: string;
+    walletType?: string;
   };
   SelectWallet: {
     chainType?: Chain;
@@ -140,6 +165,9 @@ export type SendDetailsStackParamList = {
   };
   CoinControl: {
     walletID: string;
+    sortDirection?: CoinControlSortDirection;
+    sortType?: CoinControlSortType;
+    hasUtxos?: boolean;
   };
   PaymentCodeList: {
     walletID: string;

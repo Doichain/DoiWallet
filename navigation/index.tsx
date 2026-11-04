@@ -2,17 +2,20 @@ import { createNativeStackNavigator, NativeStackNavigationOptions } from '@react
 import React, { lazy } from 'react';
 import { Platform } from 'react-native';
 import UnlockWith from '../screen/UnlockWith';
+import KeyboardShortcuts from '../screen/settings/KeyboardShortcuts';
 import { withLazySuspense } from './LazyLoadingIndicator';
 import { DetailViewStackParamList } from './DetailViewStackParamList';
 import { useStorage } from '../hooks/context/useStorage';
 import loc from '../loc';
-import navigationStyle, { CloseButtonPosition } from '../components/navigationStyle';
+import navigationStyle, { CloseButtonPosition, withRouteParamHeaderOptions } from '../components/navigationStyle';
 import { useTheme } from '../components/themes';
 import WalletXpub from '../screen/wallets/xpub';
 import WalletExport from '../screen/wallets/WalletExport';
 import ViewEditMultisigCosignerViewSheet from '../screen/wallets/ViewEditMultisigCosignerViewSheet';
 import ViewEditMultisigProvideMnemonicsSheet from '../screen/wallets/ViewEditMultisigProvideMnemonicsSheet';
 import ViewEditMultisigShareCosignerSheet from '../screen/wallets/ViewEditMultisigShareCosignerSheet';
+import ClipboardDetected from '../screen/ClipboardDetected';
+import { navigationGuardRouter } from './navigationGuard';
 
 // Lazy load all components except UnlockWith
 const DrawerRoot = lazy(() => import('./DrawerRoot'));
@@ -61,12 +64,24 @@ const MainRoot = () => {
   const theme = useTheme();
 
   return (
-    <DetailViewStack.Navigator screenOptions={{ headerShown: false }}>
+    <DetailViewStack.Navigator UNSTABLE_router={navigationGuardRouter} screenOptions={{ headerShown: false }}>
       {!walletsInitialized ? (
         <DetailViewStack.Screen name="UnlockWithScreen" component={UnlockWith} />
       ) : (
         <>
           <DetailViewStack.Screen name="DrawerRoot" component={LazyDrawerRoot} />
+
+          <DetailViewStack.Screen
+            name="KeyboardShortcuts"
+            component={KeyboardShortcuts}
+            options={navigationStyle({
+              title: 'Keyboard Shortcuts',
+              presentation: 'modal',
+              headerShown: true,
+              headerBackVisible: false,
+              closeButtonPosition: CloseButtonPosition.Right,
+            })(theme)}
+          />
 
           {/* Modal stacks */}
           <DetailViewStack.Screen name="AddWalletRoot" component={LazyAddWalletStack} options={NavigationDefaultOptions} />
@@ -92,13 +107,16 @@ const MainRoot = () => {
           <DetailViewStack.Screen
             name="ViewEditMultisigCosigners"
             component={LazyViewEditMultisigCosigners}
-            options={navigationStyle({
-              title: loc.multisig.view_edit_cosigners,
-              presentation: 'modal',
-              headerShown: true,
-              gestureEnabled: false,
-              closeButtonPosition: CloseButtonPosition.Right,
-            })(theme)}
+            options={navigationStyle(
+              {
+                title: loc.multisig.view_edit_cosigners,
+                presentation: 'modal',
+                headerShown: true,
+                gestureEnabled: false,
+                closeButtonPosition: CloseButtonPosition.Right,
+              },
+              withRouteParamHeaderOptions({ headerRight: true }),
+            )(theme)}
           />
           <DetailViewStack.Screen
             name="ViewEditMultisigCosignerViewSheet"
@@ -152,6 +170,18 @@ const MainRoot = () => {
             options={{ ...NavigationDefaultOptions, ...StatusBarLightOptions }}
           />
 
+          <DetailViewStack.Screen
+            name="ClipboardDetected"
+            component={ClipboardDetected}
+            options={navigationStyle({
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.45],
+              sheetGrabberVisible: true,
+              closeButtonPosition: CloseButtonPosition.Right,
+              title: loc.wallets.detect_on_clipboard,
+              headerShown: Platform.OS === 'ios',
+            })(theme)}
+          />
           <DetailViewStack.Screen
             name="ScanQRCode"
             component={LazyScanQRCodeComponent}

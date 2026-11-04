@@ -38,7 +38,6 @@ const LANG_EXCEPTIONS = new Set([
 const KEY_EXCEPTIONS = new Set([
   // --- Pure format strings (placeholders + punctuation only) ---
   'transactions.received_with_amount',   // "+{amt1} ({amt2})"
-  'transactions.list_conf',              // "Conf: {number}"
   'transactions.details_inputs_count',   // "Inputs ({count})"
   'transactions.details_outputs_count',  // "Outputs ({count})"
   'transactions.confirmations_lowercase',// "{confirmations} confirmations"
@@ -126,11 +125,21 @@ const KEY_EXCEPTIONS = new Set([
   'wallets.add_entropy',                 // "Entropy"
   'entropy.title',                       // "Entropy"
   'cc.sort_label',                       // "Label"
+  'receive.option_label',                // "Label" — cy/fil/id/ms glossaries: `label` is the standard loanword
   'addresses.sign_placeholder_message',  // "Message"
   'addresses.sign_placeholder_signature',// "Signature"
   'addresses.transactions',              // "Transactions"
   'bip47.contacts',                      // "Contacts"
 ]);
+
+// Per-file exceptions: a key intentionally identical to English in ONE specific
+// locale only (not exempt globally). `<file>` -> set of `section.key`.
+const FILE_KEY_EXCEPTIONS = {
+  // French "Options" is genuinely identical to the English label.
+  'fr_fr.json': new Set(['wallets.details_options']),
+  // Faroese maintainer intentionally uses the international "Send" as the button label.
+  'fo.json': new Set(['send.header']),
+};
 
 // Single tokens that are legitimate English-equal values (brands, acronyms,
 // units, technical loanwords). When the entire string is one of these we keep it.
@@ -165,7 +174,8 @@ function isAllowedValue(val) {
   return false;
 }
 
-function findLeftovers(en, target) {
+function findLeftovers(en, target, file) {
+  const fileExceptions = FILE_KEY_EXCEPTIONS[file];
   const out = [];
   for (const section of Object.keys(en)) {
     const enSec = en[section];
@@ -177,6 +187,7 @@ function findLeftovers(en, target) {
       if (tSec[key] !== enSec[key]) continue;
       const fullKey = `${section}.${key}`;
       if (KEY_EXCEPTIONS.has(fullKey)) continue;
+      if (fileExceptions && fileExceptions.has(fullKey)) continue;
       if (isAllowedValue(tSec[key])) continue;
       out.push({ section, key, value: enSec[key] });
     }
@@ -209,7 +220,7 @@ function main() {
       process.exitCode = 1;
       continue;
     }
-    const leftovers = findLeftovers(en, data);
+    const leftovers = findLeftovers(en, data, f);
     if (leftovers.length > 0) {
       totalViolations += leftovers.length;
       report.push({ file: f, leftovers });

@@ -1,27 +1,23 @@
 import Clipboard from '@react-native-clipboard/clipboard';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, RouteProp, useRoute } from '@react-navigation/native';
 import BigNumber from 'bignumber.js';
 import * as bitcoin from '@doichain/doichainjs-lib';
 import { DoichainUnit } from '../../models/doichainUnits';
 import { DOICHAIN } from '../../blue_modules/network.js';
 import React, { useCallback, useEffect } from 'react';
-import { Alert, FlatList, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View, ListRenderItemInfo } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View, ListRenderItemInfo } from 'react-native';
+import presentAlert from '../../components/Alert';
 import Icon from '../../components/Icon';
-import RNFS from 'react-native-fs';
-import { PERMISSIONS, request, RESULTS } from 'react-native-permissions';
-import Share from 'react-native-share';
 import { SecondButton } from '../../components/SecondButton';
 import * as BlueElectrum from '../../blue_modules/BlueElectrum';
 import { satoshiToBTC } from '../../blue_modules/currency';
-import { isDesktop } from '../../blue_modules/environment';
 import BlueText from '../../components/BlueText';
-import presentAlert from '../../components/Alert';
+import { writeFileAndExport } from '../../blue_modules/fs';
 import { DynamicQRCode } from '../../components/DynamicQRCode';
 import { useTheme } from '../../components/themes';
 import loc from '../../loc';
 import { useStorage } from '../../hooks/context/useStorage';
 import { useBiometrics, unlockWithBiometrics } from '../../hooks/useBiometrics';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import { useSettings } from '../../hooks/context/useSettings';
 import { useScreenProtect } from '../../hooks/useScreenProtect';
 import { BlueSpacing20 } from '../../components/BlueSpacing';
@@ -46,9 +42,8 @@ const SendCreate = () => {
   const size = transaction ? transaction.virtualSize() : 1;
   const { isPrivacyBlurEnabled, isElectrumDisabled } = useSettings();
   const { colors } = useTheme();
-  const { setOptions } = useNavigation();
+  const navigation = useNavigation();
 
-  const navigation = useExtendedNavigation();
 
   // every route into this screen hands over a PSBT; the type only marks it optional
   const inputs: CreateItem[] = (psbt?.data.inputs ?? []).map((input, index) => {
@@ -159,58 +154,23 @@ const SendCreate = () => {
 
   const exportTXN = useCallback(async () => {
     const fileName = `${Date.now()}.txn`;
-    if (Platform.OS === 'ios') {
-      const filePath = RNFS.TemporaryDirectoryPath + `/${fileName}`;
-      await RNFS.writeFile(filePath, tx);
-      Share.open({
-        url: 'file://' + filePath,
-        saveToFiles: isDesktop,
-      })
-        .catch(error => {
-          console.log(error);
-        })
-        .finally(() => {
-          RNFS.unlink(filePath);
-        });
-    } else if (Platform.OS === 'android') {
-      const granted = await request(PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE);
-      if (granted === RESULTS.GRANTED) {
-        console.log('Storage Permission: Granted');
-        const filePath = RNFS.DownloadDirectoryPath + `/${fileName}`;
-        try {
-          await RNFS.writeFile(filePath, tx);
-          presentAlert({ message: loc.formatString(loc.send.txSaved, { filePath }) });
-        } catch (e) {
-          console.log(e);
-          const message = e instanceof Error ? e.message : typeof e === 'string' ? e : 'Unknown error';
-          presentAlert({ message });
-        }
-      } else {
-        console.log('Storage Permission: Denied');
-        Alert.alert(loc.send.permission_storage_title, loc.send.permission_storage_denied_message, [
-          {
-            text: loc.send.open_settings,
-            onPress: () => {
-              Linking.openSettings();
-            },
-            style: 'default',
-          },
-          { text: loc._.cancel, onPress: () => {}, style: 'cancel' },
-        ]);
-      }
-    }
+    await writeFileAndExport(fileName, tx, false);
   }, [tx]);
 
+  const renderHeaderRight = useCallback(
+    () => (
+      <Pressable accessibilityRole="button" onPress={exportTXN} style={({ pressed }) => pressed && styles.iconPressablePressed}>
+        <Icon size={22} name="share-alternative" type="entypo" color={colors.foregroundColor} />
+      </Pressable>
+    ),
+    [colors.foregroundColor, exportTXN],
+  );
+
   useEffect(() => {
-    setOptions({
-      // eslint-disable-next-line react/no-unstable-nested-components
-      headerRight: () => (
-        <TouchableOpacity accessibilityRole="button" onPress={exportTXN}>
-          <Icon size={22} name="share-alternative" type="entypo" color={colors.foregroundColor} />
-        </TouchableOpacity>
-      ),
+    navigation.setOptions({
+      headerRight: renderHeaderRight,
     });
-  }, [colors, exportTXN, setOptions]);
+  }, [navigation, renderHeaderRight]);
 
   const _renderItem = ({ index, item }: ListRenderItemInfo<CreateItem>) => {
     return (
@@ -366,6 +326,9 @@ const styles = StyleSheet.create({
   },
   actionTouch: {
     marginVertical: 24,
+  },
+  iconPressablePressed: {
+    opacity: 0.6,
   },
   actionText: {
     color: '#9aa0aa',

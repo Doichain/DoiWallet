@@ -1,15 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, BackHandler, Image, Linking, StyleSheet, Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  Image,
+  Linking,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { sha256 } from '@noble/hashes/sha256';
-import { RouteProp, useRoute } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation, RouteProp, useRoute } from '@react-navigation/native';
+import { NativeStackNavigationOptions, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from '../../components/Icon';
 import dayjs from 'dayjs';
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import * as BlueElectrum from '../../blue_modules/BlueElectrum';
 import { satoshiToLocalCurrency } from '../../blue_modules/currency';
 import triggerHapticFeedback, { HapticFeedbackTypes } from '../../blue_modules/hapticFeedback';
 import { uint8ArrayToHex } from '../../blue_modules/uint8array-extras';
+import AddressLabelBadge from '../../components/AddressLabelBadge';
 import BlueText from '../../components/BlueText';
 import { HDSegwitBech32Transaction } from '../../class/hd-segwit-bech32-transaction';
 import { HDSegwitBech32Wallet } from '../../class/wallets/hd-segwit-bech32-wallet';
@@ -18,21 +32,23 @@ import presentAlert from '../../components/Alert';
 import { BlueLoading } from '../../components/BlueLoading';
 import { BlueSpacing10, BlueSpacing20 } from '../../components/BlueSpacing';
 import Button from '../../components/Button';
-import CopyTextToClipboard from '../../components/CopyTextToClipboard';
-import TransactionIncomingIcon from '../../components/icons/TransactionIncomingIcon';
-import TransactionOutgoingIcon from '../../components/icons/TransactionOutgoingIcon';
+import CopyTextToClipboard, { CopyTextToClipboardHandle } from '../../components/CopyTextToClipboard';
+import useScreenMenuActions from '../../hooks/useScreenMenuActions';
 import TransactionPendingIcon from '../../components/icons/TransactionPendingIcon';
+import BlocksAccordion from '../../components/BlocksAccordion';
+import TransactionStateHeader from '../../components/TransactionStateHeader';
+import { SettingsSection } from '../../components/SettingsSection';
 import SafeAreaScrollView from '../../components/SafeAreaScrollView';
 import { useTheme } from '../../components/themes';
 import prompt from '../../helpers/prompt';
 import { useStorage } from '../../hooks/context/useStorage';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import useWalletSubscribe from '../../hooks/useWalletSubscribe';
 import loc, { formatBalanceWithoutSuffix } from '../../loc';
 import { DoichainUnit } from '../../models/doichainUnits';
 import { DetailViewStackParamList } from '../../navigation/DetailViewStackParamList';
 import { NameState, describeNameOutput } from '../../utils/nameState';
 import { isOnChainTransaction, resolveTxDisplayState } from '../../blue_modules/transactionDisplayState';
+import { isWatchOnlySegwitBech32 } from '../../util/isWatchOnlySegwitBech32';
 
 dayjs.extend(relativeTime);
 
@@ -62,6 +78,10 @@ enum ButtonStatus {
 
 type RouteProps = RouteProp<DetailViewStackParamList, 'TransactionStatus'>;
 type NavigationProps = NativeStackNavigationProp<DetailViewStackParamList, 'TransactionStatus'>;
+
+type TransactionStatusHeaderOptions = NativeStackNavigationOptions & {
+  headerTitleContainerStyle?: { flex: number; maxWidth: number };
+};
 
 enum ActionType {
   SetCPFPPossible,
@@ -136,8 +156,12 @@ type TransactionDetailHeaderTitleProps = {
 
 const TransactionDetailHeaderTitle: React.FC<TransactionDetailHeaderTitleProps> = ({ direction, date, directionStyle, dateStyle }) => (
   <View style={styles.headerTitleContainer}>
-    <BlueText style={directionStyle}>{direction}</BlueText>
-    <BlueText style={dateStyle}>{date}</BlueText>
+    <BlueText style={directionStyle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+      {direction}
+    </BlueText>
+    <BlueText style={dateStyle} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+      {date}
+    </BlueText>
   </View>
 );
 
@@ -149,16 +173,75 @@ const TransactionStatus: React.FC = () => {
     isLoading: !initialTx,
   });
   const { isCPFPPossible, isRBFBumpFeePossible, isRBFCancelPossible, tx, isLoading, eta, intervalMs, wallet, loadingError } = state;
-  const { wallets, txMetadata, counterpartyMetadata, fetchAndSaveWalletTransactions, saveToDisk } = useStorage();
+  const transactionId = tx?.hash || tx?.txid;
+  const transactionIdCopyRef = useRef<CopyTextToClipboardHandle>(null);
+  useScreenMenuActions({ copyTransactionId: transactionId && !loadingError ? () => transactionIdCopyRef.current?.copy() : undefined });
+  const { wallets, txMetadata, counterpartyMetadata, addressMetadata, fetchAndSaveWalletTransactions, saveToDisk } = useStorage();
   const subscribedWallet = useWalletSubscribe(walletID);
-  const { navigate, goBack, setOptions } = useExtendedNavigation<NavigationProps>();
+  const { navigate, goBack, setOptions } = useNavigation<NavigationProps>();
   const { colors } = useTheme();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, fontScale } = useWindowDimensions();
   const fetchTxInterval = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  const scaledStyles = useMemo(() => {
+    const valueLineHeight = Math.round(48 * fontScale);
+    const valuePaddingTop = Math.round(8 * fontScale);
+
+    return {
+      value: {
+        lineHeight: valueLineHeight,
+        paddingTop: valuePaddingTop,
+        minHeight: valueLineHeight + valuePaddingTop,
+      },
+      localCurrency: {
+        lineHeight: Math.round(20 * fontScale),
+        marginTop: Math.round(6 * fontScale),
+      },
+      headerTitleDirection: {
+        lineHeight: Math.round(22 * fontScale),
+      },
+      headerTitleDate: {
+        lineHeight: Math.round(18 * fontScale),
+      },
+      stateLabel: {
+        lineHeight: Math.round(22 * fontScale),
+      },
+      stateValue: {
+        lineHeight: Math.round(18 * fontScale),
+      },
+      explorerButton: {
+        paddingVertical: Math.round(6 * fontScale),
+        paddingHorizontal: Math.round(12 * fontScale),
+      },
+      addButton: {
+        paddingVertical: Math.round(4 * fontScale),
+        paddingHorizontal: Math.round(12 * fontScale),
+      },
+      detailRow: {
+        minHeight: Math.round(24 * fontScale),
+        paddingVertical: Math.round(12 * fontScale),
+      },
+    };
+  }, [fontScale]);
 
   // Explicit width for To/ID text so Android StaticLayout can apply ellipsis (flex alone often fails on Android)
   const detailValueMaxWidth = useMemo(() => Math.max(0, Math.floor((windowWidth - 48) / 2)), [windowWidth]);
   const detailValueWidthStyle = useMemo(() => ({ width: detailValueMaxWidth }), [detailValueMaxWidth]);
+
+  // Blocks accordion state
+  const [isBlocksExpanded, setIsBlocksExpanded] = useState(false);
+  const stateCardScale = useSharedValue(1);
+  const stateCardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: stateCardScale.value }],
+  }));
+  const toggleBlocksExpanded = useCallback(() => {
+    setIsBlocksExpanded(prev => !prev);
+    stateCardScale.value = withSequence(withTiming(0.98, { duration: 100 }), withTiming(1, { duration: 150 }));
+  }, [stateCardScale]);
+
+  useEffect(() => {
+    setIsBlocksExpanded(false);
+  }, [hash]);
 
   // Advanced section state
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
@@ -197,9 +280,6 @@ const TransactionStatus: React.FC = () => {
     stateCardSent: { backgroundColor: colors.outgoingBackgroundColor },
     stateCardReceived: { backgroundColor: colors.incomingBackgroundColor },
     card: { backgroundColor: colors.elevated || colors.background },
-    sectionTitle: { backgroundColor: colors.cardSectionHeaderBackground },
-    sectionTitleText: { color: colors.foregroundColor },
-    detailsCard: { borderColor: colors.cardBorderColor },
     detailRow: {
       backgroundColor: colors.cardSectionBackground,
       borderBottomColor: colors.cardBorderColor,
@@ -212,7 +292,6 @@ const TransactionStatus: React.FC = () => {
     speedUpButtonText: { color: colors.transactionPendingColor },
     cancelButton: { backgroundColor: colors.transactionStateCancelButtonBackground },
     cancelButtonText: { color: colors.transactionPendingColor },
-    advancedHeader: { borderColor: colors.cardBorderColor },
     advancedContent: { borderTopColor: colors.cardBorderColor },
     rowValue: { color: colors.alternativeTextColor },
   });
@@ -476,7 +555,7 @@ const TransactionStatus: React.FC = () => {
             setMempoolFee(txFromMempool.fee);
           }
 
-          const satPerVbyte = txFromMempool.fee && fetchedTx.vsize ? Math.round(txFromMempool.fee / fetchedTx.vsize) : 0;
+          const satPerVbyte = txFromMempool.fee && fetchedTx.vsize ? txFromMempool.fee / fetchedTx.vsize : 0;
           const fees = await BlueElectrum.estimateFees();
 
           // Only set ETA if we have valid fee data
@@ -685,11 +764,12 @@ const TransactionStatus: React.FC = () => {
     if (!wallet || !tx?.hash) {
       return setIsCPFPPossible(ButtonStatus.Unknown);
     }
-    if (!wallet?.allowRBF()) {
+    if (!wallet?.allowRBF() || isWatchOnlySegwitBech32(wallet)) {
       return setIsCPFPPossible(ButtonStatus.NotPossible);
     }
 
     const cpfbTx = new HDSegwitBech32Transaction(null, tx.hash, wallet as HDSegwitBech32Wallet);
+
     if ((await cpfbTx.isToUsTransaction()) && (await cpfbTx.getRemoteConfirmationsNum()) === 0) {
       return setIsCPFPPossible(ButtonStatus.Possible);
     } else {
@@ -705,7 +785,12 @@ const TransactionStatus: React.FC = () => {
       return setIsRBFBumpFeePossible(ButtonStatus.NotPossible);
     }
 
-    const rbfTx = new HDSegwitBech32Transaction(null, tx.hash, wallet as HDSegwitBech32Wallet);
+    let rbfTx: HDSegwitBech32Transaction;
+    if (isWatchOnlySegwitBech32(wallet)) {
+      rbfTx = new HDSegwitBech32Transaction(null, tx.hash, wallet._hdWalletInstance);
+    } else {
+      rbfTx = new HDSegwitBech32Transaction(null, tx.hash, wallet as HDSegwitBech32Wallet);
+    }
     if (
       (await rbfTx.isOurTransaction()) &&
       (await rbfTx.getRemoteConfirmationsNum()) === 0 &&
@@ -726,7 +811,12 @@ const TransactionStatus: React.FC = () => {
       return setIsRBFCancelPossible(ButtonStatus.NotPossible);
     }
 
-    const rbfTx = new HDSegwitBech32Transaction(null, tx.hash, wallet as HDSegwitBech32Wallet);
+    let rbfTx: HDSegwitBech32Transaction;
+    if (isWatchOnlySegwitBech32(wallet)) {
+      rbfTx = new HDSegwitBech32Transaction(null, tx.hash, wallet._hdWalletInstance);
+    } else {
+      rbfTx = new HDSegwitBech32Transaction(null, tx.hash, wallet as HDSegwitBech32Wallet);
+    }
     if (
       (await rbfTx.isOurTransaction()) &&
       (await rbfTx.getRemoteConfirmationsNum()) === 0 &&
@@ -739,18 +829,37 @@ const TransactionStatus: React.FC = () => {
     }
   };
 
-  const navigateToRBFBumpFee = (transaction: Transaction, w: TWallet) => {
-    navigate('RBFBumpFee', {
-      txid: transaction.hash,
-      wallet: w,
-    });
-  };
-
-  const navigateToRBFCancel = (transaction: Transaction, w: TWallet) => {
-    navigate('RBFCancel', {
-      txid: transaction.hash,
-      wallet: w,
-    });
+  const navigateToRBF = (route: 'RBFBumpFee' | 'RBFCancel', transaction: Transaction, w: TWallet) => {
+    if (isWatchOnlySegwitBech32(w) && !w.useWithHardwareWalletEnabled()) {
+      return Alert.alert(
+        loc.wallets.details_title,
+        loc.transactions.enable_offline_signing,
+        [
+          {
+            text: loc._.ok,
+            onPress: async () => {
+              w.setUseWithHardwareWalletEnabled(true);
+              await saveToDisk();
+              navigate(route, {
+                txid: transaction.hash,
+                wallet: w,
+              });
+            },
+            style: 'default',
+          },
+          {
+            text: loc._.cancel,
+            style: 'cancel',
+          },
+        ],
+        { cancelable: false },
+      );
+    } else {
+      navigate(route, {
+        txid: transaction.hash,
+        wallet: w,
+      });
+    }
   };
 
   const navigateToCPFP = (transaction: Transaction, w: TWallet) => {
@@ -919,10 +1028,10 @@ const TransactionStatus: React.FC = () => {
   const handleNotePress = useCallback(async () => {
     // Ark rows have no on-chain hash; use their synthetic txid as fallback key.
     const metadataKey = tx.hash ?? (tx as { txid?: string }).txid;
-    const currentMemo = (metadataKey && txMetadata[metadataKey]?.memo) || '';
+    const currentMemo = (metadataKey && txMetadata?.[metadataKey]?.memo) || '';
     try {
       const newMemo = await prompt(loc.send.details_note_placeholder, '', { type: 'plain-text', defaultValue: currentMemo });
-      if (newMemo !== undefined && metadataKey) {
+      if (newMemo !== undefined && metadataKey && txMetadata) {
         txMetadata[metadataKey] = { memo: newMemo };
         await saveToDisk();
         triggerHapticFeedback(HapticFeedbackTypes.NotificationSuccess);
@@ -931,6 +1040,13 @@ const TransactionStatus: React.FC = () => {
       // User cancelled
     }
   }, [tx, txMetadata, saveToDisk]);
+
+  const handleAddressLabelPress = useCallback(
+    (address: string) => {
+      navigate('ReceiveAddressLabel', { address });
+    },
+    [navigate],
+  );
 
   const handleOpenBlockExplorer = useCallback(() => {
     if (!tx?.hash) return;
@@ -958,24 +1074,6 @@ const TransactionStatus: React.FC = () => {
         presentAlert({ message: e.message });
       });
   }, [tx?.hash]);
-
-  const renderCPFP = (transaction: Transaction, w: TWallet) => {
-    if (isCPFPPossible === ButtonStatus.Unknown) {
-      return (
-        <>
-          <ActivityIndicator />
-          <BlueSpacing20 />
-        </>
-      );
-    } else if (isCPFPPossible === ButtonStatus.Possible) {
-      return (
-        <>
-          <Button onPress={() => navigateToCPFP(transaction, w)} title={loc.transactions.status_bump} />
-          <BlueSpacing10 />
-        </>
-      );
-    }
-  };
 
   const shortenCounterpartyName = (addr: string): string => {
     if (addr.length < 20) return addr;
@@ -1008,14 +1106,22 @@ const TransactionStatus: React.FC = () => {
   const renderSection = (array: any[]) => {
     const fromArray = [];
 
-    for (const [index, address] of array.entries()) {
+    for (const address of array) {
       const isWeOwnAddress = weOwnAddress(address);
       const addressStyle = isWeOwnAddress ? [styles.weOwnAddress, stylesHook.rowValue] : [stylesHook.rowValue];
+      const label = addressMetadata[address]?.label;
 
       fromArray.push(
         <View key={address} style={styles.addressRow}>
-          <CopyTextToClipboard text={address} style={StyleSheet.flatten(addressStyle)} />
-          {index !== array.length - 1 && <BlueText style={addressStyle}>,</BlueText>}
+          <CopyTextToClipboard text={address} style={StyleSheet.flatten(addressStyle)} interactive={false} selectable />
+          {label ? (
+            <AddressLabelBadge
+              label={label}
+              style={styles.addressLabelPill}
+              onPress={() => handleAddressLabelPress(address)}
+              accessibilityLabel={`${loc.receive.option_label}: ${label}`}
+            />
+          ) : null}
         </View>,
       );
     }
@@ -1077,12 +1183,20 @@ const TransactionStatus: React.FC = () => {
   const isPending = resolveTxDisplayState(tx) === 'pending';
   const preferredBalanceUnit = wallet?.preferredBalanceUnit ?? DoichainUnit.DOI;
 
+  const showBlocksAccordion = isOnChainTx && !isPending && parsedConfirmations > 0;
+
+  const onBlocksHeaderPress = useCallback(() => {
+    if (!showBlocksAccordion) return;
+    triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
+    toggleBlocksExpanded();
+  }, [showBlocksAccordion, toggleBlocksExpanded]);
+
   // Get transaction direction and date
   const transactionDirection = txValue !== null && txValue < 0 ? loc.transactions.details_sent : loc.transactions.details_received;
   const transactionDate = tx?.timestamp ? dayjs(tx.timestamp * 1000).format('LLL') : '-';
 
   // Get memo
-  const memo = tx?.hash ? txMetadata[tx.hash]?.memo || '' : '';
+  const memo = tx?.hash ? txMetadata?.[tx.hash]?.memo || '' : '';
 
   const shortenContactName = (name: string): string => {
     if (name.length < 20) return name;
@@ -1160,15 +1274,20 @@ const TransactionStatus: React.FC = () => {
           <TransactionDetailHeaderTitle
             direction={transactionDirection}
             date={transactionDate}
-            directionStyle={[styles.headerTitleDirection, stylesHook.headerTitleDirection]}
-            dateStyle={[styles.headerTitleDate, stylesHook.titleDate]}
+            directionStyle={[styles.headerTitleDirection, stylesHook.headerTitleDirection, scaledStyles.headerTitleDirection]}
+            dateStyle={[styles.headerTitleDate, stylesHook.titleDate, scaledStyles.headerTitleDate]}
           />
         ),
-      });
+        headerTitleAlign: 'left',
+        headerTitleContainerStyle: {
+          flex: 1,
+          maxWidth: Math.max(0, windowWidth - 96),
+        },
+      } as TransactionStatusHeaderOptions);
     }
     // stylesHook is derived from colors; omitting to avoid unnecessary effect runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tx, transactionDirection, transactionDate, setOptions, colors]);
+  }, [tx, transactionDirection, transactionDate, setOptions, colors, windowWidth, scaledStyles]);
 
   if (loadingError) {
     return (
@@ -1201,15 +1320,20 @@ const TransactionStatus: React.FC = () => {
       {/* Value Section */}
       <View style={styles.valueCard}>
         <View style={styles.valueContent}>
-          <Text style={[styles.value, stylesHook.value]} selectable numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.55}>
+          <Text
+            style={[styles.value, stylesHook.value, scaledStyles.value, styles.valueFullWidth]}
+            selectable
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.55}
+          >
             {txValue !== null ? formatBalanceWithoutSuffix(txValue, preferredBalanceUnit, true) : '-'}
-            {` `}
             {preferredBalanceUnit !== DoichainUnit.LOCAL_CURRENCY && (
-              <Text style={[styles.valueUnit, stylesHook.valueUnit]}>{preferredBalanceUnit}</Text>
+              <Text style={[styles.valueUnit, stylesHook.valueUnit]}>{` ${preferredBalanceUnit}`}</Text>
             )}
           </Text>
           {txValue !== null && (
-            <Text style={[styles.localCurrency, stylesHook.localCurrency]}>
+            <Text style={[styles.localCurrency, stylesHook.localCurrency, scaledStyles.localCurrency]}>
               {preferredBalanceUnit === DoichainUnit.LOCAL_CURRENCY
                 ? `${formatBalanceWithoutSuffix(Math.abs(txValue), DoichainUnit.DOI, true)} ${DoichainUnit.DOI}`
                 : satoshiToLocalCurrency(Math.abs(txValue))}
@@ -1222,7 +1346,7 @@ const TransactionStatus: React.FC = () => {
       {renderNameOps()}
 
       {/* State Section */}
-      <View
+      <Animated.View
         style={[
           styles.stateCard,
           isPending
@@ -1230,6 +1354,7 @@ const TransactionStatus: React.FC = () => {
             : txValue !== null && txValue < 0
               ? stylesHook.stateCardSent
               : stylesHook.stateCardReceived,
+          stateCardAnimatedStyle,
         ]}
       >
         <View style={styles.stateSection}>
@@ -1238,66 +1363,86 @@ const TransactionStatus: React.FC = () => {
               <View style={styles.stateIndicator}>
                 <TransactionPendingIcon />
                 <View style={styles.stateLabelContainer}>
-                  <BlueText style={[styles.stateLabel, stylesHook.stateLabelPending]}>{loc.transactions.pending}</BlueText>
-                  <BlueText style={[styles.stateValue, stylesHook.stateValuePending, styles.stateValueInline]}>
+                  <BlueText style={[styles.stateLabel, stylesHook.stateLabelPending, scaledStyles.stateLabel]}>
+                    {loc.transactions.pending}
+                  </BlueText>
+                  <BlueText style={[styles.stateValue, stylesHook.stateValuePending, styles.stateValueInline, scaledStyles.stateValue]}>
                     {eta || loc.transactions.details_eta_analyzing}
                   </BlueText>
                 </View>
               </View>
-              {wallet && (isRBFBumpFeePossible === ButtonStatus.Possible || isRBFCancelPossible === ButtonStatus.Possible) && (
-                <View style={styles.stateButtons}>
-                  {isRBFBumpFeePossible === ButtonStatus.Possible && (
-                    <TouchableOpacity
-                      onPress={() => navigateToRBFBumpFee(tx, wallet)}
-                      style={[styles.speedUpButton, stylesHook.speedUpButton]}
-                      accessibilityRole="button"
-                    >
-                      <BlueText style={[styles.speedUpButtonText, stylesHook.speedUpButtonText]}>{loc.transactions.status_bump}</BlueText>
-                    </TouchableOpacity>
-                  )}
-                  {isRBFCancelPossible === ButtonStatus.Possible && (
-                    <TouchableOpacity
-                      onPress={() => navigateToRBFCancel(tx, wallet)}
-                      style={[styles.cancelButton, stylesHook.cancelButton]}
-                      accessibilityRole="button"
-                    >
-                      <BlueText style={[styles.cancelButtonText, stylesHook.cancelButtonText]}>{loc.transactions.status_cancel}</BlueText>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
+              {wallet &&
+                (isRBFBumpFeePossible === ButtonStatus.Possible ||
+                  isRBFCancelPossible === ButtonStatus.Possible ||
+                  isCPFPPossible === ButtonStatus.Possible) && (
+                  <View style={styles.stateButtons}>
+                    {isRBFBumpFeePossible === ButtonStatus.Possible && (
+                      <TouchableOpacity
+                        onPress={() => navigateToRBF('RBFBumpFee', tx, wallet)}
+                        style={[styles.speedUpButton, stylesHook.speedUpButton]}
+                        accessibilityRole="button"
+                      >
+                        <BlueText style={[styles.speedUpButtonText, stylesHook.speedUpButtonText]}>{loc.transactions.status_bump}</BlueText>
+                      </TouchableOpacity>
+                    )}
+                    {isCPFPPossible === ButtonStatus.Possible && (
+                      <TouchableOpacity
+                        onPress={() => navigateToCPFP(tx, wallet)}
+                        style={[styles.speedUpButton, stylesHook.speedUpButton]}
+                        accessibilityRole="button"
+                      >
+                        <BlueText style={[styles.speedUpButtonText, stylesHook.speedUpButtonText]}>{loc.transactions.status_bump}</BlueText>
+                      </TouchableOpacity>
+                    )}
+                    {/* no mempool.space accelerator: it only knows Bitcoin transactions */}
+                    {isRBFCancelPossible === ButtonStatus.Possible && (
+                      <TouchableOpacity
+                        onPress={() => navigateToRBF('RBFCancel', tx, wallet)}
+                        style={[styles.cancelButton, stylesHook.cancelButton]}
+                        accessibilityRole="button"
+                      >
+                        <BlueText style={[styles.cancelButtonText, stylesHook.cancelButtonText]}>{loc.transactions.status_cancel}</BlueText>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
             </>
           ) : txValue !== null && txValue < 0 ? (
-            <View style={styles.stateIndicator}>
-              <TransactionOutgoingIcon />
-              <View style={styles.stateLabelContainer}>
-                <BlueText style={[styles.stateLabel, stylesHook.stateLabelSent]}>{loc.transactions.details_sent}</BlueText>
-                {isOnChainTx && (
-                  <BlueText style={[styles.stateValue, stylesHook.stateValueSent, styles.stateValueInline]}>
-                    {loc.formatString(loc.transactions.confirmations_lowercase, {
-                      confirmations: parsedConfirmations > 6 ? '6+' : parsedConfirmations,
-                    })}
-                  </BlueText>
-                )}
-              </View>
-            </View>
+            <TransactionStateHeader
+              direction="sent"
+              confirmations={parsedConfirmations}
+              isOnChainTx={isOnChainTx}
+              isExpanded={isBlocksExpanded}
+              onPress={showBlocksAccordion ? onBlocksHeaderPress : undefined}
+              labelStyle={[stylesHook.stateLabelSent, scaledStyles.stateLabel]}
+              valueStyle={[stylesHook.stateValueSent, scaledStyles.stateValue]}
+              accentColor={colors.transactionSentColor}
+            />
           ) : (
-            <View style={styles.stateIndicator}>
-              <TransactionIncomingIcon />
-              <View style={styles.stateLabelContainer}>
-                <BlueText style={[styles.stateLabel, stylesHook.stateLabelReceived]}>{loc.transactions.details_received}</BlueText>
-                {isOnChainTx && (
-                  <BlueText style={[styles.stateValue, stylesHook.stateValueReceived, styles.stateValueInline]}>
-                    {loc.formatString(loc.transactions.confirmations_lowercase, {
-                      confirmations: parsedConfirmations > 6 ? '6+' : parsedConfirmations,
-                    })}
-                  </BlueText>
-                )}
-              </View>
-            </View>
+            <TransactionStateHeader
+              direction="received"
+              confirmations={parsedConfirmations}
+              isOnChainTx={isOnChainTx}
+              isExpanded={isBlocksExpanded}
+              onPress={showBlocksAccordion ? onBlocksHeaderPress : undefined}
+              labelStyle={[stylesHook.stateLabelReceived, scaledStyles.stateLabel]}
+              valueStyle={[stylesHook.stateValueReceived, scaledStyles.stateValue]}
+              accentColor={colors.transactionReceivedColor}
+            />
           )}
         </View>
-      </View>
+        {showBlocksAccordion && tx?.hash && (
+          <BlocksAccordion
+            txHash={tx.hash}
+            isSent={txValue !== null && txValue < 0}
+            isExpanded={isBlocksExpanded}
+            vsize={tx.vsize}
+            feeSats={calculatedFee}
+            feeRate={feeRate}
+            onPress={onBlocksHeaderPress}
+          />
+        )}
+      </Animated.View>
 
       {/* Counterparty badge (read-only, matches contact list style) */}
       {counterpartyDisplayName && (
@@ -1320,22 +1465,30 @@ const TransactionStatus: React.FC = () => {
       )}
 
       {/* Details Section */}
-      <View style={[styles.detailsCard, stylesHook.detailsCard]}>
-        {/* Details Title */}
-        <View style={[styles.sectionTitle, styles.sectionTitleWithButton, stylesHook.sectionTitle]}>
-          <BlueText style={[styles.sectionTitleText, stylesHook.sectionTitleText]}>{loc.transactions.details_section}</BlueText>
-          {tx?.hash && (
+      <SettingsSection
+        title={loc.transactions.details_section}
+        containerStyle={styles.sectionMargins}
+        headerRight={
+          tx?.hash ? (
             <TouchableOpacity
               onPress={handleOpenBlockExplorer}
-              style={[styles.explorerButton, stylesHook.explorerButton]}
+              style={[styles.explorerButton, stylesHook.explorerButton, scaledStyles.explorerButton]}
               activeOpacity={0.7}
             >
-              <BlueText style={[styles.explorerButtonText, stylesHook.explorerButtonText]}>{loc.transactions.details_explorer}</BlueText>
+              <BlueText
+                style={[styles.explorerButtonText, stylesHook.explorerButtonText]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {loc.transactions.details_explorer}
+              </BlueText>
             </TouchableOpacity>
-          )}
-        </View>
+          ) : undefined
+        }
+      >
         {/* Network Fee */}
-        <View style={[styles.detailRow, stylesHook.detailRow]}>
+        <View style={[styles.detailRow, stylesHook.detailRow, scaledStyles.detailRow]}>
           <BlueText style={[styles.detailLabel, stylesHook.detailLabel]}>{loc.transactions.details_network_fee}</BlueText>
           <View style={styles.detailValueContainer}>
             <CopyTextToClipboard
@@ -1346,6 +1499,8 @@ const TransactionStatus: React.FC = () => {
               }
               style={StyleSheet.flatten([styles.detailValue, stylesHook.detailValue])}
               textAlign="right"
+              interactive={false}
+              selectable
             />
           </View>
         </View>
@@ -1359,7 +1514,7 @@ const TransactionStatus: React.FC = () => {
             const displayText = externalAddresses.map(shortenCounterpartyName).join(', ');
             const copyText = externalAddresses.join(', ');
             return (
-              <View style={[styles.detailRow, stylesHook.detailRow]}>
+              <View style={[styles.detailRow, stylesHook.detailRow, scaledStyles.detailRow]}>
                 <BlueText style={[styles.detailLabel, stylesHook.detailLabel]}>{loc.transactions.details_to_address}</BlueText>
                 <View style={styles.detailValueContainer}>
                   <View style={styles.detailValueCopyContainer}>
@@ -1376,6 +1531,8 @@ const TransactionStatus: React.FC = () => {
                       numberOfLines={1}
                       ellipsizeMode="middle"
                       textAlign="right"
+                      interactive={false}
+                      selectable
                     />
                   </View>
                 </View>
@@ -1384,16 +1541,17 @@ const TransactionStatus: React.FC = () => {
           })()}
 
         {/* Transaction ID - display shortened so it stays on one line on Android; copy still gets full hash */}
-        {tx.hash && (
-          <View style={[styles.detailRow, stylesHook.detailRow]}>
+        {transactionId && (
+          <View style={[styles.detailRow, stylesHook.detailRow, scaledStyles.detailRow]}>
             <BlueText style={[styles.detailLabel, stylesHook.detailLabel]}>{loc.transactions.details_id}</BlueText>
             <View style={styles.detailValueContainer}>
               <View style={styles.detailValueCopyContainer}>
                 <CopyTextToClipboard
                   containerStyle={StyleSheet.flatten([styles.detailValueEllipsisContainer, detailValueWidthStyle])}
-                  text={tx.hash}
-                  displayText={shortenTxHash(tx.hash)}
-                  accessibilityLabel={tx.hash}
+                  ref={transactionIdCopyRef}
+                  text={transactionId}
+                  displayText={shortenTxHash(transactionId)}
+                  accessibilityLabel={transactionId}
                   buttonTestID="TransactionIdCopyButton"
                   textTestID="TransactionIdDisplayText"
                   style={StyleSheet.flatten([
@@ -1405,6 +1563,8 @@ const TransactionStatus: React.FC = () => {
                   numberOfLines={1}
                   ellipsizeMode="middle"
                   textAlign="right"
+                  interactive={false}
+                  selectable
                 />
               </View>
             </View>
@@ -1412,7 +1572,7 @@ const TransactionStatus: React.FC = () => {
         )}
 
         {/* Note/Memo */}
-        <View style={[styles.detailRow, styles.detailRowLast, stylesHook.detailRow]}>
+        <View style={[styles.detailRow, styles.detailRowLast, stylesHook.detailRow, scaledStyles.detailRow]}>
           <BlueText style={[styles.detailLabel, stylesHook.detailLabel]}>{loc.transactions.details_note}</BlueText>
           <View style={styles.detailValueContainer}>
             {memo ? (
@@ -1422,72 +1582,88 @@ const TransactionStatus: React.FC = () => {
                 </BlueText>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity onPress={handleNotePress} style={[styles.addButton, stylesHook.addButton]} activeOpacity={0.7}>
-                <BlueText style={[styles.addButtonText, stylesHook.addButtonText]}>{loc.transactions.details_add_note}</BlueText>
+              <TouchableOpacity
+                onPress={handleNotePress}
+                style={[styles.addButton, stylesHook.addButton, scaledStyles.addButton]}
+                activeOpacity={0.7}
+              >
+                <BlueText
+                  style={[styles.addButtonText, stylesHook.addButtonText]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {loc.transactions.details_add_note}
+                </BlueText>
               </TouchableOpacity>
             )}
           </View>
         </View>
-      </View>
+      </SettingsSection>
 
       {/* Advanced Section */}
-      <View style={[styles.detailsCard, stylesHook.detailsCard]}>
-        <TouchableOpacity
-          onPress={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
-          style={[styles.advancedHeader, stylesHook.advancedHeader]}
-          activeOpacity={0.85}
-        >
-          <View style={[styles.sectionTitle, stylesHook.sectionTitle, styles.sectionTitleRow]}>
-            <BlueText style={[styles.sectionTitleText, stylesHook.sectionTitleText]}>{loc.transactions.details_advanced}</BlueText>
-            <Icon
-              name={isAdvancedExpanded ? 'chevron-up' : 'chevron-down'}
-              type="font-awesome"
-              size={16}
-              color={colors.alternativeTextColor}
-            />
-          </View>
-        </TouchableOpacity>
-
+      <SettingsSection
+        title={loc.transactions.details_advanced}
+        containerStyle={styles.sectionMargins}
+        onHeaderPress={() => {
+          triggerHapticFeedback(HapticFeedbackTypes.ImpactLight);
+          setIsAdvancedExpanded(!isAdvancedExpanded);
+        }}
+        headerRight={
+          <Icon
+            name={isAdvancedExpanded ? 'chevron-up' : 'chevron-down'}
+            type="font-awesome"
+            size={16}
+            color={colors.alternativeTextColor}
+          />
+        }
+      >
         {isAdvancedExpanded && (
           <View style={[styles.advancedContent, stylesHook.advancedContent]}>
             {/* Fee Rate */}
-            <View style={[styles.detailRow, stylesHook.detailRow]}>
+            <View style={[styles.detailRow, stylesHook.detailRow, scaledStyles.detailRow]}>
               <BlueText style={[styles.detailLabel, stylesHook.detailLabel]}>{loc.transactions.details_fee_rate}</BlueText>
               <View style={styles.detailValueContainer}>
                 <CopyTextToClipboard
                   text={feeRate != null ? `${Number(feeRate.toFixed(1))} swartz/vB` : '-'}
                   style={StyleSheet.flatten([styles.detailValue, stylesHook.detailValue])}
                   textAlign="right"
+                  interactive={false}
+                  selectable
                 />
               </View>
             </View>
 
             {/* Size */}
-            <View style={[styles.detailRow, stylesHook.detailRow]}>
+            <View style={[styles.detailRow, stylesHook.detailRow, scaledStyles.detailRow]}>
               <BlueText style={[styles.detailLabel, stylesHook.detailLabel]}>{loc.transactions.details_size}</BlueText>
               <View style={styles.detailValueContainer}>
                 <CopyTextToClipboard
                   text={tx.size ? `${tx.size} B` : '-'}
                   style={StyleSheet.flatten([styles.detailValue, stylesHook.detailValue])}
                   textAlign="right"
+                  interactive={false}
+                  selectable
                 />
               </View>
             </View>
 
             {/* Virtual Size */}
-            <View style={[styles.detailRow, stylesHook.detailRow]}>
+            <View style={[styles.detailRow, stylesHook.detailRow, scaledStyles.detailRow]}>
               <BlueText style={[styles.detailLabel, stylesHook.detailLabel]}>{loc.transactions.details_virtual_size}</BlueText>
               <View style={styles.detailValueContainer}>
                 <CopyTextToClipboard
                   text={tx.vsize ? `${tx.vsize} vB` : '-'}
                   style={StyleSheet.flatten([styles.detailValue, stylesHook.detailValue])}
                   textAlign="right"
+                  interactive={false}
+                  selectable
                 />
               </View>
             </View>
 
             {/* Transaction Hex */}
-            <View style={[styles.detailRow, stylesHook.detailRow]}>
+            <View style={[styles.detailRow, stylesHook.detailRow, scaledStyles.detailRow]}>
               <BlueText style={[styles.detailLabel, stylesHook.detailLabel]}>{loc.transactions.details_tx_hex}</BlueText>
               <View style={styles.detailValueContainer}>
                 {txHex ? (
@@ -1532,10 +1708,7 @@ const TransactionStatus: React.FC = () => {
             )}
           </View>
         )}
-      </View>
-
-      {/* Action Buttons - Only show CPFP here, Speed Up and Cancel are in state section for pending */}
-      {wallet && parsedConfirmations > 0 && <View style={styles.actions}>{renderCPFP(tx, wallet)}</View>}
+      </SettingsSection>
     </SafeAreaScrollView>
   );
 };
@@ -1593,6 +1766,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'center',
     flex: 1,
+    minWidth: 0,
   },
   headerTitleDirection: {
     fontSize: 17,
@@ -1640,14 +1814,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'flex-start',
     overflow: 'visible',
+    width: '100%',
   },
   value: {
     fontSize: 40,
     fontWeight: '700',
     letterSpacing: -0.5,
-    lineHeight: 32,
+    lineHeight: 48,
     paddingTop: 8,
     minHeight: 38,
+  },
+  valueFullWidth: {
+    width: '100%',
+    flexShrink: 1,
   },
   valueUnit: {
     fontSize: 18,
@@ -1666,7 +1845,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginHorizontal: 24,
     marginBottom: 42,
-    overflow: 'hidden',
   },
   stateSection: {
     alignItems: 'flex-start',
@@ -1678,12 +1856,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
+    flex: 1,
   },
   stateLabelContainer: {
     flexDirection: 'column',
     alignItems: 'flex-start',
     marginLeft: 8,
     flex: 1,
+    minWidth: 0,
   },
   stateLabel: {
     fontSize: 16,
@@ -1746,40 +1926,16 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     flexShrink: 1,
   },
-  detailsCard: {
+  sectionMargins: {
     marginHorizontal: 24,
     marginBottom: 42,
-    padding: 0,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  sectionTitle: {
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  sectionTitleRow: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sectionTitleWithButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sectionTitleText: {
-    fontSize: 17,
-    fontWeight: '600',
   },
   explorerButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 6,
     alignSelf: 'flex-end',
-    minWidth: 50,
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1790,7 +1946,7 @@ const styles = StyleSheet.create({
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 0,
     minHeight: 24,
     paddingVertical: 12,
@@ -1814,6 +1970,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     lineHeight: 22,
     paddingRight: 12,
   },
@@ -1827,11 +1985,12 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     maxWidth: '100%',
-    flexWrap: 'nowrap',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 8,
+    flexShrink: 0,
   },
   detailValueCopyContainer: {
     flex: 1,
@@ -1856,9 +2015,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   addressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  addressLabelPill: {
+    maxWidth: '86%',
+    marginTop: 4,
   },
   detailValue: {
     fontSize: 15,
@@ -1879,7 +2042,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     alignSelf: 'flex-end',
-    minWidth: 50,
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1888,29 +2051,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 20,
   },
-  advancedHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 0,
-    minHeight: 44,
-    borderWidth: 1,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    overflow: 'hidden',
-  },
   advancedContent: {
     marginTop: 0,
     paddingTop: 0,
     paddingBottom: 0,
     borderTopWidth: 1,
-  },
-  actions: {
-    alignSelf: 'center',
-    justifyContent: 'center',
-    marginVertical: 24,
-    width: '100%',
-    paddingHorizontal: 16,
   },
   weOwnAddress: {
     fontWeight: '700',

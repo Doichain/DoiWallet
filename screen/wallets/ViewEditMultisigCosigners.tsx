@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { RouteProp, useFocusEffect, useRoute, usePreventRemove } from '@react-navigation/native';
+import { useNavigation, RouteProp, useFocusEffect, useRoute, usePreventRemove } from '@react-navigation/native';
 import { Alert, findNodeHandle, FlatList, GestureResponderEvent, ListRenderItemInfo, StyleSheet, Text, View } from 'react-native';
 import Badge from '../../components/Badge';
 import { isDesktop } from '../../blue_modules/environment';
@@ -17,7 +17,6 @@ import MultipleStepsListItem, {
 import { useTheme } from '../../components/themes';
 import prompt from '../../helpers/prompt';
 import { unlockWithBiometrics, useBiometrics } from '../../hooks/useBiometrics';
-import { useExtendedNavigation } from '../../hooks/useExtendedNavigation';
 import { useScreenProtect } from '../../hooks/useScreenProtect';
 import loc from '../../loc';
 import ActionSheet from '../ActionSheet';
@@ -28,6 +27,7 @@ import { TWallet } from '../../class/wallets/types';
 import { DetailViewStackParamList } from '../../navigation/DetailViewStackParamList';
 import { BlueSpacing10, BlueSpacing20 } from '../../components/BlueSpacing';
 import { BlueLoading } from '../../components/BlueLoading';
+import { navigateToWalletsList } from '../../NavigationService';
 
 type RouteParams = RouteProp<DetailViewStackParamList, 'ViewEditMultisigCosigners'>;
 type NavigationProp = NativeStackNavigationProp<DetailViewStackParamList, 'ViewEditMultisigCosigners'>;
@@ -39,7 +39,7 @@ const ViewEditMultisigCosigners: React.FC = () => {
   const { isBiometricUseCapableAndEnabled } = useBiometrics();
   const { isElectrumDisabled, isPrivacyBlurEnabled } = useSettings();
   const { enableScreenProtect, disableScreenProtect } = useScreenProtect();
-  const { dispatch, setOptions, navigate, navigateToWalletsList, setParams } = useExtendedNavigation<NavigationProp>();
+  const { dispatch, navigate, setParams, goBack } = useNavigation<NavigationProp>();
   const route = useRoute<RouteParams>();
   const { walletID } = route.params;
   const w = useRef(wallets.find(wallet => wallet.getID() === walletID));
@@ -121,22 +121,28 @@ const ViewEditMultisigCosigners: React.FC = () => {
       }
     }
 
-    setOptions({ headerRight: () => null });
+    setParams({ headerRight: null });
 
     setTimeout(async () => {
-      // eslint-disable-next-line prefer-const
-      let newWallets = wallets.filter(newWallet => {
-        return newWallet.getID() !== walletID;
-      }) as MultisigHDWallet[];
-      if (!isElectrumDisabled) {
-        await wallet?.fetchBalance();
+      try {
+        // eslint-disable-next-line prefer-const
+        let newWallets = wallets.filter(newWallet => {
+          return newWallet.getID() !== walletID;
+        }) as MultisigHDWallet[];
+        if (!isElectrumDisabled) {
+          await wallet?.fetchBalance();
+        }
+        newWallets.push(wallet);
+        setIsSaveButtonDisabled(true);
+        setWalletsWithNewOrder(newWallets);
+        setTimeout(() => {
+          navigateToWalletsList();
+        }, 500);
+      } catch (error: any) {
+        setIsLoading(false);
+        setParams({ headerRight: undefined });
+        presentAlert({ message: error?.message ?? String(error) });
       }
-      newWallets.push(wallet);
-      setIsSaveButtonDisabled(true);
-      setWalletsWithNewOrder(newWallets);
-      setTimeout(() => {
-        navigateToWalletsList();
-      }, 500);
     }, 100);
   };
 
@@ -154,10 +160,29 @@ const ViewEditMultisigCosigners: React.FC = () => {
             w.current = new MultisigHDWallet();
             w.current.setNativeSegwit();
           } else {
-            tempWallet.current.setSecret(w.current.getSecret());
-            if (!cancelled) {
-              setWalletData(new Array(tempWallet.current.getN()));
-              setWallet(tempWallet.current);
+            try {
+              tempWallet.current.setSecret(w.current.getSecret());
+              if (!cancelled) {
+                setWalletData(new Array(tempWallet.current.getN()));
+                setWallet(tempWallet.current);
+              }
+            } catch (_) {
+              hasLoaded.current = true;
+              setIsLoading(false);
+              return Alert.alert(
+                loc.multisig.manage_keys,
+                loc.multisig.invalid_cosigner,
+                [
+                  {
+                    text: loc._.ok,
+                    onPress: async () => {
+                      goBack();
+                    },
+                    style: 'default',
+                  },
+                ],
+                { cancelable: false },
+              );
             }
           }
           hasLoaded.current = true;
@@ -391,7 +416,8 @@ const ViewEditMultisigCosigners: React.FC = () => {
 
       const hd = new HDSegwitBech32Wallet();
       hd.setSecret(mnemonic);
-      if (!hd.validateMnemonic()) return presentAlert({ message: loc.multisig.invalid_mnemonics });
+      if (!hd.validateMnemonic() && !MultisigHDWallet.isValidElectrumSeed(hd.getSecret()))
+        return presentAlert({ message: loc.multisig.invalid_mnemonics });
       try {
         wallet.replaceCosignerXpubWithSeed(cosignerNum, hd.getSecret(), passphrase);
       } catch (e: any) {
@@ -525,6 +551,7 @@ const ViewEditMultisigCosigners: React.FC = () => {
         renderItem={_renderKeyItem}
         automaticallyAdjustKeyboardInsets
         contentInsetAdjustmentBehavior="automatic"
+        scrollToOverflowEnabled
         automaticallyAdjustContentInsets
         keyExtractor={(_item, index) => `${index}`}
         contentContainerStyle={styles.contentContainerStyle}
