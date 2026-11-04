@@ -399,6 +399,7 @@
     "add_entropy": "Entropy",
     "add_entropy_bytes": "{bytes} bytes of entropy",
     "add_entropy_generated": "{genBits} bits or {gen} bytes of generated entropy",
+    "add_entropy_mixed": "{bytes} bytes of provided entropy will be mixed into your new wallet.",
     "add_entropy_provide": "Provide entropy via dice rolls",
     "add_entropy_remain": "{genBits} bits or {gen} bytes of generated entropy. Remaining {rem} bytes will be obtained from the System random number generator.",
     "add_import_wallet": "Import wallet",
